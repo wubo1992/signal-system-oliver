@@ -15,6 +15,7 @@ from strategies.v_weinstein.weinstein_strategy import WeinsteinStrategy
 from strategies.v_eps_v2.eps_v2_strategy import EPSV2Strategy
 from strategies.cigar_butt_v1a import CigarButtV1AStrategy
 from strategies.cigar_butt_v1b import CigarButtV1BStrategy
+from strategies.v_oliver_kell import OliverKellStrategy
 
 # key   = --strategy 参数的值
 # value = 策略类（继承 StrategyBase）
@@ -23,6 +24,7 @@ STRATEGY_REGISTRY: dict[str, type] = {
     "v_eps_v2": EPSV2Strategy,
     "cigar_butt_v1a": CigarButtV1AStrategy,
     "cigar_butt_v1b": CigarButtV1BStrategy,
+    "v_oliver_kell": OliverKellStrategy,
 }
 
 # 策略分类映射：CLI key -> 类别
@@ -31,6 +33,7 @@ STRATEGY_CATEGORIES: dict[str, str] = {
     "v_eps_v2": "结合EPS",
     "cigar_butt_v1a": "捡烟蒂",
     "cigar_butt_v1b": "捡烟蒂",
+    "v_oliver_kell": "Oliver Kell",
 }
 
 

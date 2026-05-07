@@ -28,7 +28,7 @@ data:
   history_days: 3652       # 约10年，覆盖多个完整牛熊周期
 
 # ── 默认策略 ──────────────────────────────────────────────
-active_strategy: v_eps_v2
+active_strategy: v_oliver_kell
 
 # ── 策略参数 ──────────────────────────────────────────────
 strategies:
@@ -147,6 +147,29 @@ strategies:
 
     # ── Rebalance ───────────────────────────────────────────────
     rebalance_frequency: "monthly"  # 每月rebalance
+
+  # ================================================================
+  # Oliver Kell Cycle of Price Action
+  # ================================================================
+  v_oliver_kell:
+    name: "Oliver Kell Cycle of Price Action"
+    description: "Wedge Pop + EMA Crossback + Base n' Break，按原文六阶段操作"
+
+    # Cycle 检测参数
+    wedge_lookback: 20
+    base_lookback: 20
+
+    # 市场环境
+    index_symbol: "QQQ"
+
+    # 入场
+    require_wedge_pop_first: true
+
+    # 出场
+    initial_stop_pct: 0.02
+    trim_gain_threshold: 1.0
+    trailing_ema_period: 20
+    time_stop_days: 60
 
 # ------------------------------------------------------------
 # 输出设置
