@@ -9,527 +9,319 @@
 
 ---
 
-## 当前手动池总数：517 只（美股517）
+## 当前手动池总数：301 只（美股301）
 
 ---
 
-## 板块 S：标普 500 成分股（静态写入，Wikipedia 定期更新）
+## 板块 A：Oliver Kell 策略股票池
 
 | 代码 | 公司 | 简介 |
 |------|------|------|
-| A | A | S&P 500 成分股 |
-| AAPL | Apple | S&P 500 成分股 |
-| ABBV | AbbVie | S&P 500 成分股 |
-| ABNB | ABNB | S&P 500 成分股 |
-| ABT | ABT | S&P 500 成分股 |
-| ACGL | ACGL | S&P 500 成分股 |
-| ACN | Accenture | S&P 500 成分股 |
-| ADBE | Adobe | S&P 500 成分股 |
-| ADI | ADI | S&P 500 成分股 |
-| ADM | ADM | S&P 500 成分股 |
-| ADP | ADP | S&P 500 成分股 |
-| ADSK | ADSK | S&P 500 成分股 |
-| AEE | AEE | S&P 500 成分股 |
-| AEP | AEP | S&P 500 成分股 |
-| AES | AES | S&P 500 成分股 |
-| AFL | AFL | S&P 500 成分股 |
-| AIG | AIG | S&P 500 成分股 |
-| AIZ | AIZ | S&P 500 成分股 |
-| AJG | AJG | S&P 500 成分股 |
-| AKAM | AKAM | S&P 500 成分股 |
-| ALB | ALB | S&P 500 成分股 |
-| ALGN | ALGN | S&P 500 成分股 |
-| ALL | ALL | S&P 500 成分股 |
-| ALLE | ALLE | S&P 500 成分股 |
-| AMAT | Applied Materials | S&P 500 成分股 |
-| AMCR | AMCR | S&P 500 成分股 |
-| AMD | AMD | S&P 500 成分股 |
-| AME | AME | S&P 500 成分股 |
-| AMGN | Amgen | S&P 500 成分股 |
-| AMP | AMP | S&P 500 成分股 |
-| AMT | AMT | S&P 500 成分股 |
-| AMZN | Amazon | S&P 500 成分股 |
-| ANET | ANET | S&P 500 成分股 |
-| AON | AON | S&P 500 成分股 |
-| AOS | AOS | S&P 500 成分股 |
-| APA | APA | S&P 500 成分股 |
-| APD | APD | S&P 500 成分股 |
-| APH | APH | S&P 500 成分股 |
-| APO | APO | S&P 500 成分股 |
-| APP | APP | S&P 500 成分股 |
-| APTV | APTV | S&P 500 成分股 |
-| ARE | ARE | S&P 500 成分股 |
-| ARES | ARES | S&P 500 成分股 |
-| ATO | ATO | S&P 500 成分股 |
-| AVB | AVB | S&P 500 成分股 |
-| AVGO | Broadcom | S&P 500 成分股 |
-| AVY | AVY | S&P 500 成分股 |
-| AWK | AWK | S&P 500 成分股 |
-| AXON | AXON | S&P 500 成分股 |
-| AXP | AXP | S&P 500 成分股 |
-| AZO | AZO | S&P 500 成分股 |
-| BA | BA | S&P 500 成分股 |
-| BAC | Bank of America | S&P 500 成分股 |
-| BALL | BALL | S&P 500 成分股 |
-| BAX | BAX | S&P 500 成分股 |
-| BBY | BBY | S&P 500 成分股 |
-| BDX | BDX | S&P 500 成分股 |
-| BEN | BEN | S&P 500 成分股 |
-| BF-B | BF-B | S&P 500 成分股 |
-| BG | BG | S&P 500 成分股 |
-| BIIB | BIIB | S&P 500 成分股 |
-| BK | BK | S&P 500 成分股 |
-| BKNG | BKNG | S&P 500 成分股 |
-| BKR | BKR | S&P 500 成分股 |
-| BLDR | BLDR | S&P 500 成分股 |
-| BLK | BLK | S&P 500 成分股 |
-| BMY | BMY | S&P 500 成分股 |
-| BR | BR | S&P 500 成分股 |
-| BRK-B | Berkshire Hathaway | S&P 500 成分股 |
-| BRO | BRO | S&P 500 成分股 |
-| BSX | BSX | S&P 500 成分股 |
-| BX | BX | S&P 500 成分股 |
-| BXP | BXP | S&P 500 成分股 |
-| C | C | S&P 500 成分股 |
-| CAG | CAG | S&P 500 成分股 |
-| CAH | CAH | S&P 500 成分股 |
-| CARR | CARR | S&P 500 成分股 |
-| CAT | CAT | S&P 500 成分股 |
-| CB | CB | S&P 500 成分股 |
-| CBOE | CBOE | S&P 500 成分股 |
-| CBRE | CBRE | S&P 500 成分股 |
-| CCI | CCI | S&P 500 成分股 |
-| CCL | CCL | S&P 500 成分股 |
-| CDNS | CDNS | S&P 500 成分股 |
-| CDW | CDW | S&P 500 成分股 |
-| CEG | CEG | S&P 500 成分股 |
-| CF | CF | S&P 500 成分股 |
-| CFG | CFG | S&P 500 成分股 |
-| CHD | CHD | S&P 500 成分股 |
-| CHRW | CHRW | S&P 500 成分股 |
-| CHTR | CHTR | S&P 500 成分股 |
-| CI | CI | S&P 500 成分股 |
-| CIEN | CIEN | S&P 500 成分股 |
-| CINF | CINF | S&P 500 成分股 |
-| CL | CL | S&P 500 成分股 |
-| CLX | CLX | S&P 500 成分股 |
-| CMCSA | CMCSA | S&P 500 成分股 |
-| CME | CME | S&P 500 成分股 |
-| CMG | CMG | S&P 500 成分股 |
-| CMI | CMI | S&P 500 成分股 |
-| CMS | CMS | S&P 500 成分股 |
-| CNC | CNC | S&P 500 成分股 |
-| CNP | CNP | S&P 500 成分股 |
-| COF | COF | S&P 500 成分股 |
-| COIN | COIN | S&P 500 成分股 |
-| COO | COO | S&P 500 成分股 |
-| COP | COP | S&P 500 成分股 |
-| COR | COR | S&P 500 成分股 |
-| COST | Costco | S&P 500 成分股 |
-| CPAY | CPAY | S&P 500 成分股 |
-| CPB | CPB | S&P 500 成分股 |
-| CPRT | CPRT | S&P 500 成分股 |
-| CPT | CPT | S&P 500 成分股 |
-| CRH | CRH | S&P 500 成分股 |
-| CRL | CRL | S&P 500 成分股 |
-| CRM | Salesforce | S&P 500 成分股 |
-| CRWD | CrowdStrike | S&P 500 成分股 |
-| CSCO | Cisco | S&P 500 成分股 |
-| CSGP | CSGP | S&P 500 成分股 |
-| CSX | CSX | S&P 500 成分股 |
-| CTAS | CTAS | S&P 500 成分股 |
-| CTRA | CTRA | S&P 500 成分股 |
-| CTSH | CTSH | S&P 500 成分股 |
-| CTVA | CTVA | S&P 500 成分股 |
-| CVNA | CVNA | S&P 500 成分股 |
-| CVS | CVS | S&P 500 成分股 |
-| CVX | CVX | S&P 500 成分股 |
-| D | D | S&P 500 成分股 |
-| DAL | DAL | S&P 500 成分股 |
-| DASH | DASH | S&P 500 成分股 |
-| DD | DD | S&P 500 成分股 |
-| DDOG | Datadog | S&P 500 成分股 |
-| DE | DE | S&P 500 成分股 |
-| DECK | DECK | S&P 500 成分股 |
-| DELL | DELL | S&P 500 成分股 |
-| DG | DG | S&P 500 成分股 |
-| DGX | DGX | S&P 500 成分股 |
-| DHI | DHI | S&P 500 成分股 |
-| DHR | DHR | S&P 500 成分股 |
-| DIS | Walt Disney | S&P 500 成分股 |
-| DLR | DLR | S&P 500 成分股 |
-| DLTR | DLTR | S&P 500 成分股 |
-| DOC | DOC | S&P 500 成分股 |
-| DOV | DOV | S&P 500 成分股 |
-| DOW | DOW | S&P 500 成分股 |
-| DPZ | DPZ | S&P 500 成分股 |
-| DRI | DRI | S&P 500 成分股 |
-| DTE | DTE | S&P 500 成分股 |
-| DUK | DUK | S&P 500 成分股 |
-| DVA | DVA | S&P 500 成分股 |
-| DVN | DVN | S&P 500 成分股 |
-| DXCM | Dexcom | S&P 500 成分股 |
-| EA | EA | S&P 500 成分股 |
-| EBAY | EBAY | S&P 500 成分股 |
-| ECL | ECL | S&P 500 成分股 |
-| ED | ED | S&P 500 成分股 |
-| EFX | EFX | S&P 500 成分股 |
-| EG | EG | S&P 500 成分股 |
-| EIX | EIX | S&P 500 成分股 |
-| EL | EL | S&P 500 成分股 |
-| ELV | ELV | S&P 500 成分股 |
-| EME | EME | S&P 500 成分股 |
-| EMR | EMR | S&P 500 成分股 |
-| EOG | EOG | S&P 500 成分股 |
-| EPAM | EPAM | S&P 500 成分股 |
-| EQIX | EQIX | S&P 500 成分股 |
-| EQR | EQR | S&P 500 成分股 |
-| EQT | EQT | S&P 500 成分股 |
-| ERIE | ERIE | S&P 500 成分股 |
-| ES | ES | S&P 500 成分股 |
-| ESS | ESS | S&P 500 成分股 |
-| ETN | ETN | S&P 500 成分股 |
-| ETR | ETR | S&P 500 成分股 |
-| EVRG | EVRG | S&P 500 成分股 |
-| EW | EW | S&P 500 成分股 |
-| EXC | EXC | S&P 500 成分股 |
-| EXE | EXE | S&P 500 成分股 |
-| EXPD | EXPD | S&P 500 成分股 |
-| EXPE | EXPE | S&P 500 成分股 |
-| EXR | EXR | S&P 500 成分股 |
-| F | F | S&P 500 成分股 |
-| FANG | FANG | S&P 500 成分股 |
-| FAST | FAST | S&P 500 成分股 |
-| FCX | FCX | S&P 500 成分股 |
-| FDS | FDS | S&P 500 成分股 |
-| FDX | FDX | S&P 500 成分股 |
-| FE | FE | S&P 500 成分股 |
-| FFIV | FFIV | S&P 500 成分股 |
-| FICO | FICO | S&P 500 成分股 |
-| FIS | FIS | S&P 500 成分股 |
-| FISV | FISV | S&P 500 成分股 |
-| FITB | FITB | S&P 500 成分股 |
-| FIX | FIX | S&P 500 成分股 |
-| FOX | FOX | S&P 500 成分股 |
-| FOXA | FOXA | S&P 500 成分股 |
-| FRT | FRT | S&P 500 成分股 |
-| FSLR | FSLR | S&P 500 成分股 |
-| FTNT | Fortinet | S&P 500 成分股 |
-| FTV | FTV | S&P 500 成分股 |
-| GD | GD | S&P 500 成分股 |
-| GDDY | GDDY | S&P 500 成分股 |
-| GE | GE | S&P 500 成分股 |
-| GEHC | GEHC | S&P 500 成分股 |
-| GEN | GEN | S&P 500 成分股 |
-| GEV | GEV | S&P 500 成分股 |
-| GILD | Gilead | S&P 500 成分股 |
-| GIS | GIS | S&P 500 成分股 |
-| GL | GL | S&P 500 成分股 |
-| GLW | GLW | S&P 500 成分股 |
-| GM | GM | S&P 500 成分股 |
-| GNRC | GNRC | S&P 500 成分股 |
-| GOOG | GOOG | S&P 500 成分股 |
-| GOOGL | Alphabet | S&P 500 成分股 |
-| GPC | GPC | S&P 500 成分股 |
-| GPN | GPN | S&P 500 成分股 |
-| GRMN | GRMN | S&P 500 成分股 |
-| GS | GS | S&P 500 成分股 |
-| GWW | GWW | S&P 500 成分股 |
-| HAL | HAL | S&P 500 成分股 |
-| HAS | HAS | S&P 500 成分股 |
-| HBAN | HBAN | S&P 500 成分股 |
-| HCA | HCA | S&P 500 成分股 |
-| HD | Home Depot | S&P 500 成分股 |
-| HIG | HIG | S&P 500 成分股 |
-| HII | HII | S&P 500 成分股 |
-| HLT | HLT | S&P 500 成分股 |
-| HOLX | HOLX | S&P 500 成分股 |
-| HON | HON | S&P 500 成分股 |
-| HOOD | HOOD | S&P 500 成分股 |
-| HPE | HPE | S&P 500 成分股 |
-| HPQ | HPQ | S&P 500 成分股 |
-| HRL | HRL | S&P 500 成分股 |
-| HSIC | HSIC | S&P 500 成分股 |
-| HST | HST | S&P 500 成分股 |
-| HSY | HSY | S&P 500 成分股 |
-| HUBB | HUBB | S&P 500 成分股 |
-| HUM | HUM | S&P 500 成分股 |
-| HWM | HWM | S&P 500 成分股 |
-| IBKR | IBKR | S&P 500 成分股 |
-| IBM | IBM | S&P 500 成分股 |
-| ICE | ICE | S&P 500 成分股 |
-| IDXX | IDEXX | S&P 500 成分股 |
-| IEX | IEX | S&P 500 成分股 |
-| IFF | IFF | S&P 500 成分股 |
-| INCY | INCY | S&P 500 成分股 |
-| INTC | Intel | S&P 500 成分股 |
-| INTU | INTU | S&P 500 成分股 |
-| INVH | INVH | S&P 500 成分股 |
-| IP | IP | S&P 500 成分股 |
-| IQV | IQV | S&P 500 成分股 |
-| IR | IR | S&P 500 成分股 |
-| IRM | IRM | S&P 500 成分股 |
-| ISRG | Intuitive Surgical | S&P 500 成分股 |
-| IT | IT | S&P 500 成分股 |
-| ITW | ITW | S&P 500 成分股 |
-| IVZ | IVZ | S&P 500 成分股 |
-| J | J | S&P 500 成分股 |
-| JBHT | JBHT | S&P 500 成分股 |
-| JBL | JBL | S&P 500 成分股 |
-| JCI | JCI | S&P 500 成分股 |
-| JKHY | JKHY | S&P 500 成分股 |
-| JNJ | Johnson & Johnson | S&P 500 成分股 |
-| JPM | JPMorgan Chase | S&P 500 成分股 |
-| KDP | KDP | S&P 500 成分股 |
-| KEY | KEY | S&P 500 成分股 |
-| KEYS | KEYS | S&P 500 成分股 |
-| KHC | KHC | S&P 500 成分股 |
-| KIM | KIM | S&P 500 成分股 |
-| KKR | KKR | S&P 500 成分股 |
-| KLAC | KLAC | S&P 500 成分股 |
-| KMB | KMB | S&P 500 成分股 |
-| KMI | KMI | S&P 500 成分股 |
-| KO | Coca-Cola | S&P 500 成分股 |
-| KR | KR | S&P 500 成分股 |
-| KVUE | KVUE | S&P 500 成分股 |
-| L | L | S&P 500 成分股 |
-| LDOS | LDOS | S&P 500 成分股 |
-| LEN | LEN | S&P 500 成分股 |
-| LH | LH | S&P 500 成分股 |
-| LHX | LHX | S&P 500 成分股 |
-| LII | LII | S&P 500 成分股 |
-| LIN | LIN | S&P 500 成分股 |
-| LLY | Eli Lilly | S&P 500 成分股 |
-| LMT | LMT | S&P 500 成分股 |
-| LNT | LNT | S&P 500 成分股 |
-| LOW | LOW | S&P 500 成分股 |
-| LRCX | LRCX | S&P 500 成分股 |
-| LULU | LULU | S&P 500 成分股 |
-| LUV | LUV | S&P 500 成分股 |
-| LVS | LVS | S&P 500 成分股 |
-| LW | LW | S&P 500 成分股 |
-| LYB | LYB | S&P 500 成分股 |
-| LYV | LYV | S&P 500 成分股 |
-| MA | Mastercard | S&P 500 成分股 |
-| MAA | MAA | S&P 500 成分股 |
-| MAR | MAR | S&P 500 成分股 |
-| MAS | MAS | S&P 500 成分股 |
-| MCD | McDonald's | S&P 500 成分股 |
-| MCHP | MCHP | S&P 500 成分股 |
-| MCK | MCK | S&P 500 成分股 |
-| MCO | MCO | S&P 500 成分股 |
-| MDLZ | MDLZ | S&P 500 成分股 |
-| MDT | MDT | S&P 500 成分股 |
-| MET | MET | S&P 500 成分股 |
-| META | Meta | S&P 500 成分股 |
-| MGM | MGM | S&P 500 成分股 |
-| MKC | MKC | S&P 500 成分股 |
-| MLM | MLM | S&P 500 成分股 |
-| MMM | MMM | S&P 500 成分股 |
-| MNST | MNST | S&P 500 成分股 |
-| MO | MO | S&P 500 成分股 |
-| MOH | MOH | S&P 500 成分股 |
-| MOS | MOS | S&P 500 成分股 |
-| MPC | MPC | S&P 500 成分股 |
-| MPWR | MPWR | S&P 500 成分股 |
-| MRK | Merck | S&P 500 成分股 |
-| MRNA | Moderna | S&P 500 成分股 |
-| MRSH | MRSH | S&P 500 成分股 |
-| MS | MS | S&P 500 成分股 |
-| MSCI | MSCI | S&P 500 成分股 |
-| MSFT | Microsoft | S&P 500 成分股 |
-| MSI | MSI | S&P 500 成分股 |
-| MTB | MTB | S&P 500 成分股 |
-| MTCH | MTCH | S&P 500 成分股 |
-| MTD | MTD | S&P 500 成分股 |
-| MU | MU | S&P 500 成分股 |
-| NCLH | NCLH | S&P 500 成分股 |
-| NDAQ | NDAQ | S&P 500 成分股 |
-| NDSN | NDSN | S&P 500 成分股 |
-| NEE | NEE | S&P 500 成分股 |
-| NEM | NEM | S&P 500 成分股 |
-| NFLX | Netflix | S&P 500 成分股 |
-| NI | NI | S&P 500 成分股 |
-| NKE | NKE | S&P 500 成分股 |
-| NOC | NOC | S&P 500 成分股 |
-| NOW | ServiceNow | S&P 500 成分股 |
-| NRG | NRG | S&P 500 成分股 |
-| NSC | NSC | S&P 500 成分股 |
-| NTAP | NTAP | S&P 500 成分股 |
-| NTRS | NTRS | S&P 500 成分股 |
-| NUE | NUE | S&P 500 成分股 |
-| NVDA | NVIDIA | S&P 500 成分股 |
-| NVR | NVR | S&P 500 成分股 |
-| NWS | NWS | S&P 500 成分股 |
-| NWSA | NWSA | S&P 500 成分股 |
-| NXPI | NXPI | S&P 500 成分股 |
-| O | O | S&P 500 成分股 |
-| ODFL | ODFL | S&P 500 成分股 |
-| OKE | OKE | S&P 500 成分股 |
-| OMC | OMC | S&P 500 成分股 |
-| ON | ON | S&P 500 成分股 |
-| ORCL | ORCL | S&P 500 成分股 |
-| ORLY | ORLY | S&P 500 成分股 |
-| OTIS | OTIS | S&P 500 成分股 |
-| OXY | OXY | S&P 500 成分股 |
-| PANW | Palo Alto Networks | S&P 500 成分股 |
-| PAYC | PAYC | S&P 500 成分股 |
-| PAYX | PAYX | S&P 500 成分股 |
-| PCAR | PCAR | S&P 500 成分股 |
-| PCG | PCG | S&P 500 成分股 |
-| PEG | PEG | S&P 500 成分股 |
-| PEP | PepsiCo | S&P 500 成分股 |
-| PFE | Pfizer | S&P 500 成分股 |
-| PFG | PFG | S&P 500 成分股 |
-| PG | Procter & Gamble | S&P 500 成分股 |
-| PGR | PGR | S&P 500 成分股 |
-| PH | PH | S&P 500 成分股 |
-| PHM | PHM | S&P 500 成分股 |
-| PKG | PKG | S&P 500 成分股 |
-| PLD | PLD | S&P 500 成分股 |
-| PLTR | PLTR | S&P 500 成分股 |
-| PM | PM | S&P 500 成分股 |
-| PNC | PNC | S&P 500 成分股 |
-| PNR | PNR | S&P 500 成分股 |
-| PNW | PNW | S&P 500 成分股 |
-| PODD | PODD | S&P 500 成分股 |
-| POOL | POOL | S&P 500 成分股 |
-| PPG | PPG | S&P 500 成分股 |
-| PPL | PPL | S&P 500 成分股 |
-| PRU | PRU | S&P 500 成分股 |
-| PSA | PSA | S&P 500 成分股 |
-| PSKY | PSKY | S&P 500 成分股 |
-| PSX | PSX | S&P 500 成分股 |
-| PTC | PTC | S&P 500 成分股 |
-| PWR | PWR | S&P 500 成分股 |
-| PYPL | PayPal | S&P 500 成分股 |
-| Q | Q | S&P 500 成分股 |
-| QCOM | Qualcomm | S&P 500 成分股 |
-| RCL | RCL | S&P 500 成分股 |
-| REG | REG | S&P 500 成分股 |
-| REGN | Regeneron | S&P 500 成分股 |
-| RF | RF | S&P 500 成分股 |
-| RJF | RJF | S&P 500 成分股 |
-| RL | RL | S&P 500 成分股 |
-| RMD | RMD | S&P 500 成分股 |
-| ROK | ROK | S&P 500 成分股 |
-| ROL | ROL | S&P 500 成分股 |
-| ROP | ROP | S&P 500 成分股 |
-| ROST | ROST | S&P 500 成分股 |
-| RSG | RSG | S&P 500 成分股 |
-| RTX | RTX | S&P 500 成分股 |
-| RVTY | RVTY | S&P 500 成分股 |
-| SBAC | SBAC | S&P 500 成分股 |
-| SBUX | SBUX | S&P 500 成分股 |
-| SCHW | SCHW | S&P 500 成分股 |
-| SHW | SHW | S&P 500 成分股 |
-| SJM | SJM | S&P 500 成分股 |
-| SLB | SLB | S&P 500 成分股 |
-| SMCI | SMCI | S&P 500 成分股 |
-| SNA | SNA | S&P 500 成分股 |
-| SNDK | SNDK | S&P 500 成分股 |
-| SNPS | SNPS | S&P 500 成分股 |
-| SO | SO | S&P 500 成分股 |
-| SOLV | SOLV | S&P 500 成分股 |
-| SPG | SPG | S&P 500 成分股 |
-| SPGI | SPGI | S&P 500 成分股 |
-| SRE | SRE | S&P 500 成分股 |
-| STE | STE | S&P 500 成分股 |
-| STLD | STLD | S&P 500 成分股 |
-| STT | STT | S&P 500 成分股 |
-| STX | STX | S&P 500 成分股 |
-| STZ | STZ | S&P 500 成分股 |
-| SW | SW | S&P 500 成分股 |
-| SWK | SWK | S&P 500 成分股 |
-| SWKS | SWKS | S&P 500 成分股 |
-| SYF | SYF | S&P 500 成分股 |
-| SYK | SYK | S&P 500 成分股 |
-| SYY | SYY | S&P 500 成分股 |
-| T | T | S&P 500 成分股 |
-| TAP | TAP | S&P 500 成分股 |
-| TDG | TDG | S&P 500 成分股 |
-| TDY | TDY | S&P 500 成分股 |
-| TECH | TECH | S&P 500 成分股 |
-| TEL | TEL | S&P 500 成分股 |
-| TER | TER | S&P 500 成分股 |
-| TFC | TFC | S&P 500 成分股 |
-| TGT | TGT | S&P 500 成分股 |
-| TJX | TJX | S&P 500 成分股 |
-| TKO | TKO | S&P 500 成分股 |
-| TMO | TMO | S&P 500 成分股 |
-| TMUS | TMUS | S&P 500 成分股 |
-| TPL | TPL | S&P 500 成分股 |
-| TPR | TPR | S&P 500 成分股 |
-| TRGP | TRGP | S&P 500 成分股 |
-| TRMB | TRMB | S&P 500 成分股 |
-| TROW | TROW | S&P 500 成分股 |
-| TRV | TRV | S&P 500 成分股 |
-| TSCO | TSCO | S&P 500 成分股 |
-| TSLA | Tesla | S&P 500 成分股 |
-| TSN | TSN | S&P 500 成分股 |
-| TT | TT | S&P 500 成分股 |
-| TTD | TTD | S&P 500 成分股 |
-| TTWO | TTWO | S&P 500 成分股 |
-| TXN | Texas Instruments | S&P 500 成分股 |
-| TXT | TXT | S&P 500 成分股 |
-| TYL | TYL | S&P 500 成分股 |
-| UAL | UAL | S&P 500 成分股 |
-| UBER | Uber | S&P 500 成分股 |
-| UDR | UDR | S&P 500 成分股 |
-| UHS | UHS | S&P 500 成分股 |
-| ULTA | ULTA | S&P 500 成分股 |
-| UNH | UnitedHealth | S&P 500 成分股 |
-| UNP | UNP | S&P 500 成分股 |
-| UPS | UPS | S&P 500 成分股 |
-| URI | URI | S&P 500 成分股 |
-| USB | USB | S&P 500 成分股 |
-| V | Visa | S&P 500 成分股 |
-| VICI | VICI | S&P 500 成分股 |
-| VLO | VLO | S&P 500 成分股 |
-| VLTO | VLTO | S&P 500 成分股 |
-| VMC | VMC | S&P 500 成分股 |
-| VRSK | VRSK | S&P 500 成分股 |
-| VRSN | VRSN | S&P 500 成分股 |
-| VRTX | Vertex | S&P 500 成分股 |
-| VST | VST | S&P 500 成分股 |
-| VTR | VTR | S&P 500 成分股 |
-| VTRS | VTRS | S&P 500 成分股 |
-| VZ | VZ | S&P 500 成分股 |
-| WAB | WAB | S&P 500 成分股 |
-| WAT | WAT | S&P 500 成分股 |
-| WBD | WBD | S&P 500 成分股 |
-| WDAY | WDAY | S&P 500 成分股 |
-| WDC | WDC | S&P 500 成分股 |
-| WEC | WEC | S&P 500 成分股 |
-| WELL | WELL | S&P 500 成分股 |
-| WFC | WFC | S&P 500 成分股 |
-| WM | WM | S&P 500 成分股 |
-| WMB | WMB | S&P 500 成分股 |
-| WMT | Walmart | S&P 500 成分股 |
-| WRB | WRB | S&P 500 成分股 |
-| WSM | WSM | S&P 500 成分股 |
-| WST | WST | S&P 500 成分股 |
-| WTW | WTW | S&P 500 成分股 |
-| WY | WY | S&P 500 成分股 |
-| WYNN | WYNN | S&P 500 成分股 |
-| XEL | XEL | S&P 500 成分股 |
-| XOM | Exxon Mobil | S&P 500 成分股 |
-| XYL | XYL | S&P 500 成分股 |
-| XYZ | XYZ | S&P 500 成分股 |
-| YUM | YUM | S&P 500 成分股 |
-| ZBH | ZBH | S&P 500 成分股 |
-| ZBRA | ZBRA | S&P 500 成分股 |
-| ZTS | ZTS | S&P 500 成分股 |
+| QQQ | Invesco QQQ | Oliver Kell 池（市场环境判断） |
+| COF | Capital One | Oliver Kell 池 |
+| COST | Costco | Oliver Kell 池 |
+| WMT | Walmart | Oliver Kell 池 |
+| BF-B | Brown-Forman | Oliver Kell 池 |
+| UBER | Uber | Oliver Kell 池 |
+| PANW | Palo Alto Networks | Oliver Kell 池 |
+| CRWD | CrowdStrike | Oliver Kell 池 |
+| META | Meta Platforms | Oliver Kell 池 |
+| ARM | Arm Holdings | Oliver Kell 池 |
+| ESI | ES&P 500 | Oliver Kell 池 |
+| VRT | Vertiv Holdings | Oliver Kell 池 |
+| CRM | Salesforce | Oliver Kell 池 |
+| NVDA | NVIDIA | Oliver Kell 池 |
+| MRVL | Marvell Technology | Oliver Kell 池 |
+| BKV | BKV | Oliver Kell 池 |
+| OKTA | Okta | Oliver Kell 池 |
+| BA | Boeing | Oliver Kell 池 |
+| LLY | Eli Lilly | Oliver Kell 池 |
+| ACM | Jacobs Solutions | Oliver Kell 池 |
+| PLTR | Palantir | Oliver Kell 池 |
+| FDX | FedEx | Oliver Kell 池 |
+| LNG | Cheniere Energy | Oliver Kell 池 |
+| GEV | GE Vernova | Oliver Kell 池 |
+| PL | Planet Labs | Oliver Kell 池 |
+| SIDU | Sidus Space | Oliver Kell 池 |
+| ASTS | AST SpaceMobile | Oliver Kell 池 |
+| RKLB | Rocket Lab | Oliver Kell 池 |
+| SATL | Satellogic | Oliver Kell 池 |
+| CAT | Caterpillar | Oliver Kell 池 |
+| COHR | Coherent | Oliver Kell 池 |
+| FN | Fabrinet | Oliver Kell 池 |
+| LITE | Lumentum | Oliver Kell 池 |
+| AXP | American Express | Oliver Kell 池 |
+| BGC | BGC Group | Oliver Kell 池 |
+| ENB | Enbridge | Oliver Kell 池 |
+| GE | General Electric | Oliver Kell 池 |
+| KLAC | KLA Corp | Oliver Kell 池 |
+| LSCC | Lattice Semiconductor | Oliver Kell 池 |
+| JD | JD.com | Oliver Kell 池 |
+| GS | Goldman Sachs | Oliver Kell 池 |
+| JNJ | Johnson & Johnson | Oliver Kell 池 |
+| FITB | Fifth Third | Oliver Kell 池 |
+| LHX | L3Harris | Oliver Kell 池 |
+| SYF | Synchrony | Oliver Kell 池 |
+| CRS | Carpenter | Oliver Kell 池 |
+| NFLX | Netflix | Oliver Kell 池 |
+| MAIR | MAIR | Oliver Kell 池 |
+| VST | Vistra | Oliver Kell 池 |
+| CAVA | CAVA | Oliver Kell 池 |
+| BR | Broadridge | Oliver Kell 池 |
+| PEP | PepsiCo | Oliver Kell 池 |
+| CPF | CPF | Oliver Kell 池 |
+| MXL | MaxLinear | Oliver Kell 池 |
+| BVS | BVS | Oliver Kell 池 |
+| ORMP | ORMP | Oliver Kell 池 |
+| WATT | Energous | Oliver Kell 池 |
+| FHN | First Horizon | Oliver Kell 池 |
+| CVX | Chevron | Oliver Kell 池 |
+| JBHT | J.B. Hunt | Oliver Kell 池 |
+| LMT | Lockheed Martin | Oliver Kell 池 |
+| ITRN | Iterum | Oliver Kell 池 |
+| KIM | Kimco Realty | Oliver Kell 池 |
+| KINS | Kingstone | Oliver Kell 池 |
+| VICR | Vicor | Oliver Kell 池 |
+| GAIN | Gladstone | Oliver Kell 池 |
+| IDR | IDR | Oliver Kell 池 |
+| CTBI | Community Trust | Oliver Kell 池 |
+| CPRT | Copart | Oliver Kell 池 |
+| DHI | D.R. Horton | Oliver Kell 池 |
+| DELL | Dell | Oliver Kell 池 |
+| LRCX | Lam Research | Oliver Kell 池 |
+| CSTM | Constellium | Oliver Kell 池 |
+| FSLR | First Solar | Oliver Kell 池 |
+| LUV | Southwest Airlines | Oliver Kell 池 |
+| JOUT | Johnson Outdoors | Oliver Kell 池 |
+| MATW | Matthew | Oliver Kell 池 |
+| TXN | Texas Instruments | Oliver Kell 池 |
+| INTC | Intel | Oliver Kell 池 |
+| COEP | Cohen & Steers | Oliver Kell 池 |
+| DX | Dynex | Oliver Kell 池 |
+| FIVE | Five Below | Oliver Kell 池 |
+| GORO | Gore | Oliver Kell 池 |
+| JMSB | JMSB | Oliver Kell 池 |
+| KARO | Karo | Oliver Kell 池 |
+| KN | KN | Oliver Kell 池 |
+| KOPN | Kopin | Oliver Kell 池 |
+| AMZN | Amazon | Oliver Kell 池 |
+| FTV | Fortive | Oliver Kell 池 |
+| ELA | Envela | Oliver Kell 池 |
+| STX | Seagate | Oliver Kell 池 |
+| MSFT | Microsoft | Oliver Kell 池 |
+| UNH | UnitedHealth | Oliver Kell 池 |
+| RTX | RTX | Oliver Kell 池 |
+| LEN | Lennar | Oliver Kell 池 |
+| LEVI | Levi Strauss | Oliver Kell 池 |
+| PSMT | P.S. MT | Oliver Kell 池 |
+| BX | Blackstone | Oliver Kell 池 |
+| TH | TH | Oliver Kell 池 |
+| ODFL | Old Dominion | Oliver Kell 池 |
+| TMO | Thermo Fisher | Oliver Kell 池 |
+| HD | Home Depot | Oliver Kell 池 |
+| CAH | Cardinal Health | Oliver Kell 池 |
+| PCG | PG&E | Oliver Kell 池 |
+| CVS | CVS Health | Oliver Kell 池 |
+| TSLA | Tesla | Oliver Kell 池 |
+| MP | MP | Oliver Kell 池 |
+| HAL | Halliburton | Oliver Kell 池 |
+| CCJ | Cameco | Oliver Kell 池 |
+| NOK | Nokia | Oliver Kell 池 |
+| GOOGL | Alphabet A | Oliver Kell 池 |
+| GNRC | Generac | Oliver Kell 池 |
+| BE | Bloom Energy | Oliver Kell 池 |
+| NXPI | NXP | Oliver Kell 池 |
+| SBUX | Starbucks | Oliver Kell 池 |
+| EAT | Brinker | Oliver Kell 池 |
+| YUM | Yum! Brands | Oliver Kell 池 |
+| DPZ | Domino's | Oliver Kell 池 |
+| F | Ford | Oliver Kell 池 |
+| SOFI | SoFi | Oliver Kell 池 |
+| VIK | VIK | Oliver Kell 池 |
+| BSY | Bentley | Oliver Kell 池 |
+| SNAP | Snap | Oliver Kell 池 |
+| ADBE | Adobe | Oliver Kell 池 |
+| TEAM | Atlassian | Oliver Kell 池 |
+| OKE | ONEOK | Oliver Kell 池 |
+| STZ | Constellation | Oliver Kell 池 |
+| VTR | Ventas | Oliver Kell 池 |
+| AEM | Agnico Eagle | Oliver Kell 池 |
+| DAL | Delta Air Lines | Oliver Kell 池 |
+| WELL | Welltower | Oliver Kell 池 |
+| NEM | Newmont | Oliver Kell 池 |
+| TTD | Trade Desk | Oliver Kell 池 |
+| NKE | Nike | Oliver Kell 池 |
+| GOLF | Acushnet | Oliver Kell 池 |
+| NUE | Nucor | Oliver Kell 池 |
+| IBM | IBM | Oliver Kell 池 |
+| VSNT | Vesnt | Oliver Kell 池 |
+| NOW | ServiceNow | Oliver Kell 池 |
+| WDAY | Workday | Oliver Kell 池 |
+| INTU | Intuit | Oliver Kell 池 |
+| CRML | CRML | Oliver Kell 池 |
+| CAR | Avis Budget | Oliver Kell 池 |
+| LWLG | Lightwave | Oliver Kell 池 |
+| POET | POET | Oliver Kell 池 |
+| NVTS | Navitas | Oliver Kell 池 |
+| CRDO | Crido | Oliver Kell 池 |
+| WDC | Western Digital | Oliver Kell 池 |
+| SNDK | SanDisk | Oliver Kell 池 |
+| MU | Micron | Oliver Kell 池 |
+| TSM | Taiwan Semi | Oliver Kell 池 |
+| FCFS | FirstCash | Oliver Kell 池 |
+| GOOG | Alphabet C | Oliver Kell 池 |
+| SNEX | StoneX | Oliver Kell 池 |
+| EWBC | East West | Oliver Kell 池 |
+| TTMI | TTM | Oliver Kell 池 |
+| RRBI | RRBI | Oliver Kell 池 |
+| CORZ | Core | Oliver Kell 池 |
+| SYRE | Syre | Oliver Kell 池 |
+| SPG | Simon Property | Oliver Kell 池 |
+| FSBC | First Savings | Oliver Kell 池 |
+| MPB | MB | Oliver Kell 池 |
+| NTST | NTST | Oliver Kell 池 |
+| OMER | Omer | Oliver Kell 池 |
+| OOMA | Ooma | Oliver Kell 池 |
+| PKE | Park | Oliver Kell 池 |
+| PODC | Pod | Oliver Kell 池 |
+| ILPT | Industrial | Oliver Kell 池 |
+| KZIA | Kazia | Oliver Kell 池 |
+| ARWR | Arrowhead | Oliver Kell 池 |
+| CATY | Cathay | Oliver Kell 池 |
+| ECPG | EMC | Oliver Kell 池 |
+| SIGI | Selective | Oliver Kell 池 |
+| SNA | Snap-on | Oliver Kell 池 |
+| UNP | Union Pacific | Oliver Kell 池 |
+| DXPE | DXP | Oliver Kell 池 |
+| NRXS | NRXS | Oliver Kell 池 |
+| SLAB | Silicon | Oliver Kell 池 |
+| ADAM | ADAM | Oliver Kell 池 |
+| CFFN | Cap | Oliver Kell 池 |
+| FRST | First | Oliver Kell 池 |
+| LFST | Life | Oliver Kell 池 |
+| MYFW | First Western | Oliver Kell 池 |
+| NWBI | Northwest | Oliver Kell 池 |
+| THR | Thermon | Oliver Kell 池 |
+| ADTN | ADTN | Oliver Kell 池 |
+| EBMT | Eagle | Oliver Kell 池 |
+| IFRX | InflaRx | Oliver Kell 池 |
+| NGL | NGL | Oliver Kell 池 |
+| IBP | Interface | Oliver Kell 池 |
+| ORKA | ORKA | Oliver Kell 池 |
+| RLAY | Relay | Oliver Kell 池 |
+| FIG | Figs | Oliver Kell 池 |
+| GD | General Dynamics | Oliver Kell 池 |
+| HIG | Hartford | Oliver Kell 池 |
+| PNC | PNC Financial | Oliver Kell 池 |
+| TAL | Tal Education | Oliver Kell 池 |
+| UI | UI | Oliver Kell 池 |
+| ELDN | Eldec | Oliver Kell 池 |
+| KMI | Kinder Morgan | Oliver Kell 池 |
+| PRLD | Prelude | Oliver Kell 池 |
+| TLYS | Tillys | Oliver Kell 池 |
+| AAPL | Apple | Oliver Kell 池 |
+| ADI | Analog Devices | Oliver Kell 池 |
+| AGX | Argan | Oliver Kell 池 |
+| ALGM | Allegro MicroSystems | Oliver Kell 池 |
+| AMD | AMD | Oliver Kell 池 |
+| APYX | Apyx Medical | Oliver Kell 池 |
+| ARW | Arrow Electronics | Oliver Kell 池 |
+| ASM | Aurinia Pharmaceuticals | Oliver Kell 池 |
+| BDSX | Biodesix | Oliver Kell 池 |
+| BLDP | Ballard Power | Oliver Kell 池 |
+| CBOE | CBOE Global Markets | Oliver Kell 池 |
+| CD | Centamin | Oliver Kell 池 |
+| CMP | CMP Materials | Oliver Kell 池 |
+| CRGY | Corergy | Oliver Kell 池 |
+| CRSR | Corsair | Oliver Kell 池 |
+| CSCO | Cisco | Oliver Kell 池 |
+| CTRE | CareTrust | Oliver Kell 池 |
+| CVSA | Covetrus | Oliver Kell 池 |
+| CXW | CoreCivic | Oliver Kell 池 |
+| DXYZ | Doxy.me | Oliver Kell 池 |
+| ELMD | ElectroMedical Systems | Oliver Kell 池 |
+| ENTA | Enanta Pharmaceuticals | Oliver Kell 池 |
+| EPR | EPR Properties | Oliver Kell 池 |
+| ESTA | Establishment Labs | Oliver Kell 池 |
+| EZPW | EZCORP | Oliver Kell 池 |
+| FRD | Friedman's | Oliver Kell 池 |
+| GDC | GDC Technology | Oliver Kell 池 |
+| GSL | Global Ship Lease | Oliver Kell 池 |
+| HL | Hecla Mining | Oliver Kell 池 |
+| HR | Healthcare Realty | Oliver Kell 池 |
+| IBKR | Interactive Brokers | Oliver Kell 池 |
+| ISRG | Intuitive Surgical | Oliver Kell 池 |
+| LASR | L3Harris | Oliver Kell 池 |
+| MKSI | MKS Instruments | Oliver Kell 池 |
+| NTCT | NetScout | Oliver Kell 池 |
+| NTLA | Intellia Therapeutics | Oliver Kell 池 |
+| NYAX | NYAX | Oliver Kell 池 |
+| ONDS | Ondas Networks | Oliver Kell 池 |
+| OPLN | Opler | Oliver Kell 池 |
+| PKBK | Parke Bancorp | Oliver Kell 池 |
+| PLUS | Plus | Oliver Kell 池 |
+| RELY | Remitly | Oliver Kell 池 |
+| RMD | ResMed | Oliver Kell 池 |
+| SIF | SIFCO | Oliver Kell 池 |
+| SII | S&P Global | Oliver Kell 池 |
+| SITM | SCM Microsystems | Oliver Kell 池 |
+| SLS | Sellas Life Sciences | Oliver Kell 池 |
+| THG | The Hanover Insurance | Oliver Kell 池 |
+| TPC | Trico Bancshares | Oliver Kell 池 |
+| TUSK | Mammoth Energy | Oliver Kell 池 |
+| UHS | Universal Health Services | Oliver Kell 池 |
+| UTHR | United Therapeutics | Oliver Kell 池 |
+| VRTX | Vertex Pharmaceuticals | Oliver Kell 池 |
+| WT | Windtree Therapeutics | Oliver Kell 池 |
+| XIFR | XIFIN | Oliver Kell 池 |
+| ZVRA | Zavare | Oliver Kell 池 |
+| ETN | Eaton | Oliver Kell 池 |
+| HON | Honeywell | Oliver Kell 池 |
+| CPSH | CPSH | Oliver Kell 池 |
+| LUNR | Intuitive Machines | Oliver Kell 池 |
+| RDW | Redwire | Oliver Kell 池 |
+| AAOI | Applied Optoelectronics | Oliver Kell 池 |
+| AEHR | Aehr Test Systems | Oliver Kell 池 |
+| AMKR | Amkor Technology | Oliver Kell 池 |
+| APH | Amphenol | Oliver Kell 池 |
+| ASX | ASE Technology | Oliver Kell 池 |
+| AVGO | Broadcom | Oliver Kell 池 |
+| CAMT | Camtek | Oliver Kell 池 |
+| CIEN | Ciena | Oliver Kell 池 |
+| CLS | Celestica | Oliver Kell 池 |
+| FORM | FormFactor | Oliver Kell 池 |
+| GFS | GlobalFoundries | Oliver Kell 池 |
+| GLW | Corning | Oliver Kell 池 |
+| HIMX | Himax Technologies | Oliver Kell 池 |
+| JBL | Jabil | Oliver Kell 池 |
+| KEYS | Keysight Technologies | Oliver Kell 池 |
+| MTSI | MACOM Technology | Oliver Kell 池 |
+| ONTO | Onto Innovation | Oliver Kell 池 |
+| SMTC | Semtech | Oliver Kell 池 |
+| TEL | TE Connectivity | Oliver Kell 池 |
+| TSEM | Tower Semiconductor | Oliver Kell 池 |
+| UMC | United Microelectronics | Oliver Kell 池 |
+| VIAV | Viavi Solutions | Oliver Kell 池 |
+| XLU | Utilities Select Sector SPDR | Oliver Kell 池 |
+| CEG | Constellation Energy | Oliver Kell 池 |
+| AXTI | AXT Inc | Oliver Kell 池 |
+| SOI | Soitec | Oliver Kell 池 |
+| WIN | Globalstar/Winteg | Oliver Kell 池 |
+| SIVE | Sivers Semiconductors | Oliver Kell 池 |
+| NBIS | Nebius | Oliver Kell 池 |
+| RPI | Raspberry Pi | Oliver Kell 池 |
+| AIRO | AIRO Group | Oliver Kell 池 |
+| HIMS | Hims & Hers | Oliver Kell 池 |
+| NEXT | NextDecade | Oliver Kell 池 |
+| IREN | Iris Energy | Oliver Kell 池 |
+| CRWV | CoreWeave | Oliver Kell 池 |
+| WULF | TeraWulf | Oliver Kell 池 |
+| CIFR | Cipher Mining | Oliver Kell 池 |
+| WYFI | WiSA Technologies | Oliver Kell 池 |
+| HUT | Hut 8 Mining | Oliver Kell 池 |
 
-## 操作说明
+---
 
-### 添加股票
-直接在对应板块的表格末尾加一行：
-```
-```
-保存后，下次运行程序时自动生效。
+## 待移出记录
 
-### 删除股票
-把那一行从板块表格中删除，移到末尾「待移出记录」节（保留历史记录）。
-
-### 添加新板块
+（暂无）

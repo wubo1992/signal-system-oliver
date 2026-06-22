@@ -43,22 +43,22 @@ class CigarButtV1BSCanner:
         self.market_data = market_data
 
         # 解析配置
-        # 第一层：深度价值
-        self.max_p_ncav = self.cfg.get("max_p_ncav", 0.75)
-        self.max_p_netnet = self.cfg.get("max_p_netnet", 0.85)
-        self.max_p_b = self.cfg.get("max_p_b", 1.2)
-        self.max_p_e = self.cfg.get("max_p_e", 15)
+        # 第一层：深度价值（严格烟蒂版）
+        self.max_p_ncav = self.cfg.get("max_p_ncav", 1.5)
+        self.max_p_netnet = self.cfg.get("max_p_netnet", 2.0)
+        self.max_p_b = self.cfg.get("max_p_b", 1.5)
+        self.max_p_e = self.cfg.get("max_p_e", 10)
         self.max_debt_ratio = self.cfg.get("max_debt_ratio", 0.50)
 
         # 第二层：盈利质量
         self.require_positive_eps = self.cfg.get("require_positive_eps", True)
         self.require_positive_cfo = self.cfg.get("require_positive_cfo", True)
-        self.max_revenue_decline_1y = self.cfg.get("max_revenue_decline_1y", 0.20)
+        self.max_revenue_decline_1y = self.cfg.get("max_revenue_decline_1y", 0.30)
 
         # 第三层：流动性
-        self.min_market_cap = self.cfg.get("min_market_cap", 100_000_000)
-        self.max_market_cap = self.cfg.get("max_market_cap", 5_000_000_000)
-        self.min_avg_dollar_volume = self.cfg.get("min_avg_dollar_volume_20d", 1_000_000)
+        self.min_market_cap = self.cfg.get("min_market_cap", 50_000_000)
+        self.max_market_cap = self.cfg.get("max_market_cap", 10_000_000_000)
+        self.min_avg_dollar_volume = self.cfg.get("min_avg_dollar_volume_20d", 200_000)
 
         # 仓位
         self.max_positions = self.cfg.get("max_positions", 25)
@@ -164,8 +164,9 @@ class CigarButtV1BSCanner:
                 current_liabilities=bs.get("current_liabilities", 0),
                 total_liabilities=bs.get("total_liabilities", 0),
                 total_assets=bs.get("total_assets", 0),
-                net_income_ttm=cf.get("net_income_ttm", inc.get("net_income", 0)),
-                operating_cash_flow_ttm=cf.get("operating_cash_flow_ttm", 0),
+                # 从 financials 顶层获取 TTM 数据（不是从空的 cf 字典）
+                net_income_ttm=financials.get("net_income_ttm", 0) or cf.get("net_income_ttm", 0),
+                operating_cash_flow_ttm=financials.get("operating_cash_flow_ttm", 0) or cf.get("operating_cash_flow_ttm", 0),
                 net_income_history=inc.get("net_income_history", []),
                 revenue_1y_ago=inc.get("revenue_1y_ago", 0),
                 revenue_current=inc.get("revenue_current", inc.get("revenue", 0)),
@@ -178,7 +179,7 @@ class CigarButtV1BSCanner:
                 candidates.append(stock)
                 ncav = calculate_ncav_v1b(stock)
                 p_ncav = calculate_p_ncav_v1b(stock, ncav)
-                print(f"  [V1B] {symbol}: P/NCAV={p_ncav:.2f}, P/E={stock.pe_ratio:.1f}, CFO=${cf.get('operating_cash_flow_ttm', 0):,.0f}")
+                print(f"  [V1B] {symbol}: P/NCAV={p_ncav:.2f}, P/E={stock.pe_ratio:.1f}, CFO=${financials.get('operating_cash_flow_ttm', 0):,.0f}")
             else:
                 skipped += 1
 
@@ -225,8 +226,10 @@ class CigarButtV1BSCanner:
             if market_cap <= 0:
                 market_cap = bs_result.get('market_cap', 0)
 
-            if market_cap > 0 and inc.get("net_income", 0) > 0:
-                bs_result["pe_ratio"] = market_cap / inc.get("net_income", 0)
+            # 使用 net_income_ttm（如果有的话）计算 PE
+            net_income = bs_result.get('net_income_ttm', 0) or inc.get("net_income", 0)
+            if market_cap > 0 and net_income > 0:
+                bs_result["pe_ratio"] = market_cap / net_income
             else:
                 bs_result["pe_ratio"] = 0
 

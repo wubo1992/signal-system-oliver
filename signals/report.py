@@ -79,8 +79,9 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
     ]
 
     # ── 今日新增信号 ───────────────────────────────────────
-    today_buys  = [r for r in today_records if r.get("信号") == "买入"]
-    today_sells = [r for r in today_records if r.get("信号") == "卖出"]
+    today_buys   = [r for r in today_records if r.get("信号") == "买入"]
+    today_sells  = [r for r in today_records if r.get("信号") == "卖出"]
+    today_shorts = [r for r in today_records if r.get("信号") == "做空"]
 
     if not today_records:
         lines += [
@@ -109,6 +110,15 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                 lines += _format_exit_signal(r)
                 lines.append("")
 
+        if today_shorts:
+            lines += [
+                "## 今日做空信号",
+                "",
+            ]
+            for r in sorted(today_shorts, key=lambda x: -int(x.get("强度(1-5)", 0))):
+                lines += _format_short_signal(r, is_today=True)
+                lines.append("")
+
     lines += ["---", ""]
 
     # ── 过去7天汇总表 ──────────────────────────────────────
@@ -118,8 +128,9 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
     ]
 
     all_recent = history  # 已经包含今天
-    buys_7d  = [r for r in all_recent if r.get("信号") == "买入"]
-    sells_7d = [r for r in all_recent if r.get("信号") == "卖出"]
+    buys_7d   = [r for r in all_recent if r.get("信号") == "买入"]
+    sells_7d  = [r for r in all_recent if r.get("信号") == "卖出"]
+    shorts_7d = [r for r in all_recent if r.get("信号") == "做空"]
 
     if not all_recent:
         lines.append("> 过去 7 天内无任何信号记录。\n")
@@ -151,6 +162,22 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                 reason_short = r.get("触发原因", "")[:45]
                 shares = r.get("持仓股数", "—")
                 lines.append(f"| {r['日期']} | **{r['股票']}** | {shares:>8} | {reason_short} |")
+            lines.append("")
+
+        if shorts_7d:
+            lines += [
+                "### 做空信号",
+                "",
+                "| 日期 | 股票 | 强度 | 参考止损 | 触发摘要 |",
+                "|------|------|------|----------|----------|",
+            ]
+            for r in sorted(shorts_7d, key=lambda x: x.get("日期", ""), reverse=True):
+                stars = "★" * int(r.get("强度(1-5)", 0))
+                summary = _short_summary(r.get("触发原因", ""))
+                lines.append(
+                    f"| {r['日期']} | **{r['股票']}** | {stars} "
+                    f"| {r.get('参考止损', '—')} | {summary} |"
+                )
             lines.append("")
 
     lines += ["---", ""]
@@ -307,6 +334,52 @@ def _format_exit_signal(r: dict) -> list[str]:
     elif "时间止损" in reason:
         lines.append("> 时间止损触发：持仓超过 20 天但盈利不足 3%，释放资金避免占用过久。")
     lines.append("")
+    return lines
+
+
+def _format_short_signal(r: dict, is_today: bool) -> list[str]:
+    """格式化做空信号的详细 Markdown 块。"""
+    symbol    = r.get("股票", "?")
+    date_str  = r.get("日期", "?")
+    strength  = int(r.get("强度(1-5)", 0))
+    stars     = "★" * strength + "☆" * (5 - strength)
+    stop_loss = r.get("参考止损", "—")
+    reason    = r.get("触发原因", "")
+
+    tag = "🆕 **今日新增**" if is_today else f"📅 {date_str}"
+    lines = [
+        f"### {tag} — 做空 {symbol}　{stars}",
+        "",
+        "**信号概览**",
+        "",
+        "| 项目 | 内容 |",
+        "|------|------|",
+        f"| 信号日期 | {date_str} |",
+        f"| 信号方向 | 做空 |",
+        f"| 信号强度 | {stars}（{strength}/5） |",
+        f"| 止损价格 | {stop_loss}（buy-to-cover） |",
+        f"| 建议操作 | {'明日开盘做空' if is_today else date_str + ' 次日已可执行'} |",
+        "",
+    ]
+
+    # 提取触发原因中的关键信息
+    if "Wedge Drop" in reason:
+        lines.append("**触发条件：** Wedge Drop（楔形下跌）")
+        lines.append("- 价格跌破 EMA10 和 EMA20，且两者都在下降")
+        lines.append("- 建议止损：buy-to-cover at EMA20 × 1.02")
+    elif "Exhaustion" in reason:
+        lines.append("**触发条件：** Exhaustion Extension（衰竭延伸）")
+        lines.append("- 价格超过 EMA 10% 以上且跳空上涨 ≥ 3%")
+        lines.append("- 建议止损：buy-to-cover at 当日高点 × 1.02")
+
+    lines.append("")
+    lines += [
+        "> **风险提示**：以上均为系统自动识别的技术信号，不构成投资建议。",
+        f"> 做空止损 {stop_loss} 对应从做空价亏损约 2%，务必在做空后立即设置 buy-to-cover 止损单。",
+        "",
+        "---",
+    ]
+
     return lines
 
 

@@ -155,11 +155,7 @@ def fetch(
             print(f"[数据] 指数 {remaining_index} 暂不支持，跳过")
 
         if intl_full:
-            print(f"[数据] 非美股 {len(intl_full)} 只，直接走 Yahoo Finance（全量）...")
-            yahoo_full = _fetch_via_yahoo(intl_full, start_date, end_date, history_days)
-            for symbol, df in yahoo_full.items():
-                result[symbol] = df
-                _save_local(symbol, df)
+            print(f"[数据] 非美股 {len(intl_full)} 只，Alpaca 不支持，跳过")
 
         if us_full:
             alpaca_result = _fetch_via_alpaca(us_full, start_date, end_date)
@@ -169,45 +165,7 @@ def fetch(
 
             still_missing = [s for s in us_full if s not in alpaca_result]
             if still_missing:
-                print(f"[数据] Alpaca 未覆盖 {len(still_missing)} 只，尝试 Yahoo Finance...")
-                yahoo_result = _fetch_via_yahoo(still_missing, start_date, end_date, history_days)
-                for symbol, df in yahoo_result.items():
-                    result[symbol] = df
-                    _save_local(symbol, df)
-
-            # ── Alpha Vantage 补充：Alpaca 数据不足 2016 年则补充 2010-2016 ─
-            # 检查 Alpaca 返回的数据中，有哪些股票的截止日期早于 2016-01-01
-            # 这说明其历史不够长，需要用 Alpha Vantage 补充早期数据
-            cutoff_2016 = datetime(2016, 1, 1, tzinfo=timezone.utc)
-            need_av_backfill = []
-            for symbol, df in alpaca_result.items():
-                last_date = df.index[-1]
-                if last_date.tzinfo is None:
-                    last_date = last_date.tz_localize("UTC")
-                if last_date < cutoff_2016:
-                    need_av_backfill.append(symbol)
-
-            if need_av_backfill:
-                print(f"[数据] {len(need_av_backfill)} 只股票 Alpaca 数据截止于 2016 年前，用 Alpha Vantage 补充历史...")
-                av_result = _fetch_via_alpha_vantage(need_av_backfill, start_date, end_date)
-                for symbol, df in av_result.items():
-                    # Alpha Vantage 可能有更早的数据，合并
-                    existing = result.get(symbol)
-                    if existing is not None and not existing.empty:
-                        # 确保时区一致：统一转换为 UTC 再合并
-                        if df.index.tz is None and existing.index.tz is not None:
-                            df = df.copy()
-                            df.index = df.index.tz_localize("UTC")
-                        elif df.index.tz is not None and existing.index.tz is None:
-                            existing = existing.copy()
-                            existing.index = existing.index.tz_localize("UTC")
-                        merged = pd.concat([df, existing])
-                        merged = merged[~merged.index.duplicated(keep="last")]
-                        merged = merged.sort_index()
-                        result[symbol] = merged
-                    else:
-                        result[symbol] = df
-                    _save_local(symbol, df)
+                print(f"[数据] Alpaca 未覆盖 {len(still_missing)} 只，跳过")
 
     # ── 第三步：增量更新（使用 Alpaca + Yahoo 备用）────────────────────────────
     if need_update:
@@ -246,22 +204,15 @@ def fetch(
         new_data: dict = {}
 
         if intl_update:
-            print(f"[数据] 非美股 {len(intl_update)} 只，直接走 Yahoo Finance（增量）...")
-            yahoo_delta = _fetch_via_yahoo(intl_update, delta_start, end_date, 30)
-            new_data.update(yahoo_delta)
+            print(f"[数据] 非美股 {len(intl_update)} 只，Alpaca 不支持，跳过")
 
         if us_update:
-            us_update_tuples = [(s, df) for s, df in need_update if _is_us_stock(s)]
-            new_data_alpaca = _fetch_via_alpaca(us_update, delta_start, end_date)
+            alpaca_delta = _fetch_via_alpaca(us_update, delta_start, end_date)
+            new_data.update(alpaca_delta)
 
-            # Alpaca 不支持的股票走 Yahoo Finance 增量补充
-            alpaca_missed = [s for s in us_update if s not in new_data_alpaca]
-            if alpaca_missed:
-                print(f"[数据] 增量更新：Alpaca 未覆盖 {len(alpaca_missed)} 只，尝试 Yahoo Finance...")
-                yahoo_delta2 = _fetch_via_yahoo(alpaca_missed, delta_start, end_date, 30)
-                new_data_alpaca.update(yahoo_delta2)
-
-            new_data.update(new_data_alpaca)
+            still_missing = [s for s in us_update if s not in alpaca_delta]
+            if still_missing:
+                print(f"[数据] Alpaca 增量未覆盖 {len(still_missing)} 只，跳过")
 
         for symbol, existing_df in need_update:
             new_rows = new_data.get(symbol)

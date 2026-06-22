@@ -51,7 +51,12 @@ class MarketEnvironment:
             return MarketState.HOSTILE
 
         current_price = float(index_df["close"].iloc[-1])
-        ema20 = float(index_df["EMA20"].iloc[-1])
+
+        # Compute EMA20 inline if not present in DataFrame
+        if "EMA20" in index_df.columns:
+            ema20 = float(index_df["EMA20"].iloc[-1])
+        else:
+            ema20 = float(index_df["close"].ewm(span=20).mean().iloc[-1])
 
         # 检查趋势：持续下跌 = Hostile
         if self._is_systematic_decline(index_df):

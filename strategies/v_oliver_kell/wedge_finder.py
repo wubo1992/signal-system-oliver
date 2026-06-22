@@ -53,6 +53,22 @@ class WedgeFinder:
         self.lookback = lookback
         self.convergence_threshold = convergence_threshold
 
+    def _get_prev_day_row(self, df: pd.DataFrame) -> pd.Series | None:
+        """
+        获取前一天的正确bar（修复双bar股票问题）。
+        yfinance每天返回两个bar（05:00和14:30 UTC），
+        iloc[-2]可能取到当天盘前而非前一天收盘bar。
+        """
+        if len(df) < 2:
+            return None
+        current_idx = df.index[-1]
+        prev_day = current_idx.normalize() - pd.Timedelta(days=1)
+        mask = df.index.normalize() == prev_day
+        matches = df[mask]
+        if len(matches) > 0:
+            return matches.iloc[-1]
+        return df.iloc[-2]
+
     def find_wedge(self, df: pd.DataFrame) -> WedgeResult | None:
         """
         在最近 N 天数据中查找楔形形态。
@@ -128,7 +144,7 @@ class WedgeFinder:
             lower_bound=lower_bound,
             breakout_detected=breakout_detected,
             breakout_direction=breakout_direction,
-            breakout_day_low=today_low,
+            breakout_day_low=today_low if breakout_detected and breakout_direction == "up" else 0.0,
         )
 
     def is_wedge_pop(self, df: pd.DataFrame, ema10: float, ema20: float) -> bool:
@@ -154,24 +170,23 @@ class WedgeFinder:
         if not (current > ema10 and current > ema20):
             return False
 
-        # 放量确认
-        vol_now = float(df["volume"].iloc[-1])
-        vol_avg = float(df["volume"].iloc[-21:-1].mean())
-        if vol_avg == 0:
-            return False
-        vol_ratio = vol_now / vol_avg
-
-        return vol_ratio >= 1.5
+        # 成交量检查已移除（IEX 只占全市场成交量的一部分，占比稳定时相对变化仍有效，
+        # 但不再作为触发信号的硬性约束）
 
     def get_breakout_stop(self, df: pd.DataFrame) -> float:
         """
         获取 Wedge Pop 的止损价。
 
-        原文：Stop: Below breakout day closing low
-        实现：突破日收盘价最低点
+        原文（Page 13, 20, 25）：Stop: Below breakout day low
+
+        实现：突破日的最低价（backtest中用当天actual low，
+        live中用昨天low作为当天breakout low的估计）。
         """
         if len(df) < 2:
             return 0.0
-        # 取最近 2 天的最低价
-        recent_lows = df["low"].iloc[-2:].values
-        return float(np.min(recent_lows))
+        # 用昨天的最低价作为"breakout day low"的估计
+        # (live交易时今天的数据还未确定，用昨天作为代理)
+        # 使用_get_prev_day_row修复双bar股票问题
+        prev_row = self._get_prev_day_row(df)
+        yesterday_low = float(prev_row["low"])
+        return yesterday_low

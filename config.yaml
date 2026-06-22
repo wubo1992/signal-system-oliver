@@ -13,10 +13,7 @@ auto_universe:
   source: alpaca
   initial_lookback_days: 365
   max_age_days: 365
-  include_indices:
-    - sp500
-    - nasdaq100
-    - russell2000
+  include_indices: []
 
 # 合并规则：最终股票池 = UNIVERSE.md ∪ 指数成分股 ∪ Alpaca 自动池（自动去重）
 

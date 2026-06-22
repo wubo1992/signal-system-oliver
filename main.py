@@ -40,6 +40,11 @@ from signals.generator import process_signals
 from signals.log_generator import update_signals_log
 from signals.positions import load_positions, save_positions
 from signals.report import generate_daily_report
+from signals.watchlist_scanner import scan_watchlist
+from signals.oliver_kell_radar_report import (
+    generate_radar_report,
+    print_radar_console,
+)
 from strategies.registry import get_strategy
 from universe.manager import get_universe, _read_universe_md
 from universe.updater import run_scan
@@ -170,6 +175,23 @@ def run_live(config: dict, strategy_arg: str | None) -> None:
     )
     print(f"\n[报告] 今日报告：{report_path}")
 
+    # ── Oliver Kell 雷达报告（仅 v_oliver_kell 策略）────────────────────
+    if strategy_id == "v_oliver_kell":
+        # 扫描 watchlist 候选股
+        watchlist_records = scan_watchlist(market_data, today)
+
+        # 打印雷达报告到控制台
+        print_radar_console(records, watchlist_records)
+
+        # 生成雷达 Markdown 报告
+        radar_path = generate_radar_report(
+            today_records=records,
+            watchlist_records=watchlist_records,
+            strategy_id=strategy_id,
+            strategy_name=strategy_name,
+        )
+        print(f"[雷达] 雷达报告：{radar_path}")
+
     # 更新全策略信号汇总日志
     t5 = time.time()
     print("\n[信号日志] 更新全策略信号汇总...")
@@ -211,13 +233,13 @@ def run_backtest(
     print(f"测试区间：{start_str} 至 {end_str}")
     print("=" * 60)
 
-    # 使用手动股票池（回测不抓取新闻，从 UNIVERSE.md 读取）
-    manual_symbols = _read_universe_md()
-    if not manual_symbols:
-        print("[错误] 回测模式找不到股票池，请检查 UNIVERSE.md 是否存在且包含股票")
+    # 使用完整股票池（和 live mode 一样）
+    symbols = get_universe(config)
+    if not symbols:
+        print("[错误] 回测模式找不到股票池")
         sys.exit(1)
 
-    print(f"\n股票池：{manual_symbols}")
+    print(f"\n股票池：{symbols[:50]}{'...' if len(symbols) > 50 else ''} (共{len(symbols)}只)")
 
     if split:
         # 自动拆分：前 2/3 为样本内，后 1/3 为样本外
@@ -232,7 +254,7 @@ def run_backtest(
         print("运行样本内回测...")
         _run_single_backtest(
             config, strategy_cls, strategy_config, strategy_name,
-            manual_symbols, start_date, split_point, "样本内",
+            symbols, start_date, split_point, "样本内",
             save_signals=save_signals,
             position_size=position_size,
             initial_capital=initial_capital,
@@ -242,7 +264,7 @@ def run_backtest(
         print("运行样本外回测（OOS）...")
         _run_single_backtest(
             config, strategy_cls, strategy_config, strategy_name,
-            manual_symbols, split_point, end_date, "样本外 OOS ← 真正的考试",
+            symbols, split_point, end_date, "样本外 OOS ← 真正的考试",
             save_signals=save_signals,
             position_size=position_size,
             initial_capital=initial_capital,
@@ -250,7 +272,7 @@ def run_backtest(
     else:
         _run_single_backtest(
             config, strategy_cls, strategy_config, strategy_name,
-            manual_symbols, start_date, end_date,
+            symbols, start_date, end_date,
             save_signals=save_signals,
             position_size=position_size,
             initial_capital=initial_capital,
@@ -498,6 +520,19 @@ def main() -> None:
 
             report_path = generate_daily_report(records, strategy_id=strategy_id, strategy_name=strategy_name)
             print(f"[报告] 今日报告：{report_path}")
+
+            # ── Oliver Kell 雷达报告（仅 v_oliver_kell 策略）────────────
+            if strategy_id == "v_oliver_kell":
+                watchlist_records = scan_watchlist(market_data, today)
+                print_radar_console(records, watchlist_records)
+                radar_path = generate_radar_report(
+                    today_records=records,
+                    watchlist_records=watchlist_records,
+                    strategy_id=strategy_id,
+                    strategy_name=strategy_name,
+                )
+                print(f"[雷达] 雷达报告：{radar_path}")
+
             t3 = time.time()
             print(f"[耗时] 信号+报告: {t3-t2:.1f}秒")
 

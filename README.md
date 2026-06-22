@@ -1,32 +1,23 @@
-# Weinstein + EPS 美股交易信号系统
+# Signal System Oliver
 
-> 基于 Weinstein Stage 2 技术框架 + EPS 基本面筛选的事件驱动型交易信号系统
+> 基于 Oliver Kell *Cycle of Price Action* 六阶段理论的事件驱动美股信号系统
 
-每天收盘后自动扫描 ~5000 只股票，输出 Weinstein Stage 2 突破 + EPS 增长双确认的买入/卖出信号。
+每日收盘后自动扫描股票池，输出**买入 / 做空 / 出场 / 观望**四类信号，附带触发原因、参考止损、强度评级。
 
 **系统不自动下单，所有信号仅供参考。**
 
 ---
 
-## 策略说明（v_eps_v2）
+## 项目亮点
 
-### 入场条件（需同时满足）
-
-1. **Weinstein Stage 2 技术条件**
-   - SMA150 处于上升趋势（过去 30 天持续上行）
-   - 当前价格在 SMA150 均线上方
-   - 价格突破过去 30 日整理区间高点
-   - 成交量 ≥ 1.5 倍 20 日均量（放量确认）
-
-2. **EPS 基本面筛选**
-   - 近 2 季 EPS 同比正增长
-   - 近 2 季 EPS 环比正增长
-
-### 出场条件
-
-- **固定止损**：入场价 × 92%
-- **追踪止盈**：从最高点回落 15%
-- **时间止损**：持仓 ≥ 60 天且涨幅 < 5%
+| 维度 | 说明 |
+|------|------|
+| **策略** | Oliver Kell 六阶段循环：Reversal Extension → Wedge Pop → EMA Crossback → Base n' Break → Exhaustion → Wedge Drop |
+| **架构** | 事件驱动，策略插件化（`StrategyBase` + `STRATEGY_REGISTRY`）|
+| **数据** | 三层缓存（本地 → 增量 → 全量），Alpaca IEX 主源 + Yahoo 备用 + GitHub VIX |
+| **回测** | 事件驱动回测引擎，支持样本内/外拆分，6 项指标评估（Sharpe、年化、回撤、胜率、盈亏比、信号频率）|
+| **报告** | 每日 Markdown 日报 + 雷达报告（含 Watchlist 候选）|
+| **自动化** | macOS launchd 每日北京时间 05:30 自动运行 + 系统通知 |
 
 ---
 
@@ -36,12 +27,13 @@
 
 - Python 3.13+
 - [uv](https://github.com/astral-sh/uv)（推荐）或 pip
+- 至少 5GB 可用磁盘（数据缓存）
 
 ### 安装
 
 ```bash
-git clone <repo-url>
-cd signal_system_v_eps_v2
+git clone https://github.com/wubo1992/signal-system-oliver.git
+cd signal-system-oliver
 uv sync
 ```
 
@@ -52,23 +44,62 @@ cp .env.example .env
 # 编辑 .env，填入你的 Alpaca API Key
 ```
 
-获取 API Key：
-- [Alpaca](https://alpaca.markets/) — 免费行情数据（注册后获取 API Key + Secret Key）
-- [Finnhub](https://finnhub.io/) — 免费 EPS 数据（注册后获取 API Token）
-- [Alpha Vantage](https://www.alphavantage.co/) — EPS 备用数据源（免费 API Key）
+获取免费 API Key：[Alpaca Markets](https://alpaca.markets/)（注册即送 IEX 实时 + 历史数据）
 
-### 运行实盘信号（收盘后）
+> 可选：Finnhub（EPS）、Alpha Vantage（2010-2016 历史）、Polygon、SEC EDGAR（完全免费但慢）
+
+### 第一次运行（下载 301 只美股约 10 年历史数据）
 
 ```bash
-uv run python main.py --mode live --strategy v_eps_v2
+uv run python main.py --mode live --strategy v_oliver_kell
 ```
 
-### 运行回测
+首次运行会下载约 7GB 历史数据（耗时 5-15 分钟）。之后每次增量更新只需 30 秒。
+
+### 跑回测
 
 ```bash
 uv run python main.py --mode backtest \
-  --start 2021-01-01 --end 2026-03-01 \
-  --strategy v_eps_v2
+    --start 2026-01-01 --end 2026-05-13 \
+    --strategy v_oliver_kell
+```
+
+报告自动保存到 `output/v_oliver_kell/backtest/`。
+
+---
+
+## 信号类型
+
+| 方向 | 类型 | 强度 | 触发条件简述 |
+|------|------|------|-------------|
+| 🟢 买入 | Wedge Pop | ★★★★★ | EMA 下方盘整后放量突破（最佳买点）|
+| 🟢 买入 | EMA Crossback | ★★★★☆ | 价格回踩 EMA 后次日确认上行 |
+| 🟢 买入 | Base n' Break | ★★★☆☆ | EMA20 上方盘整 10-20 天后突破 |
+| 🟢 买入 | Variant Patterns | ★★☆☆☆ | VCP / Bull Flag / Bull Pennant |
+| 🔴 做空 | Wedge Drop Short | ★★★★★ | 价格 < EMA10 × 0.92，EMA 双降 |
+| 🔴 做空 | Exhaustion Short | ★★★★☆ | 顶部衰竭 + Gap Up ≥ 3% |
+| ⚪ 卖出 | Exit (7级优先级) | — | Wedge Drop / 硬止损 / EMA20 跌破 / 假突破 / 主动减仓 / 时间止损 / 3x Trapped |
+| 👀 观望 | Reversal Extension | ★★★ | 价格远低于 EMA20 + 放量下跌（Capitulation）|
+| 👀 观望 | Base Tightening | ★★ | EMA 上方 + 10 天波动率 < 5%（待突破）|
+
+详细规则见 [`docs/PRD_v_oliver_kell_2026-05-15_v2.md`](docs/PRD_v_oliver_kell_2026-05-15_v2.md)。
+
+---
+
+## 股票池
+
+合并三个来源（去重排序）：
+
+1. **手动池**：直接编辑 [`UNIVERSE.md`](UNIVERSE.md)（当前 301 只美股）
+2. **指数成分股**：S&P 500 / Nasdaq 100 / Russell 2000（Wikipedia + 本地缓存）
+3. **Alpaca 新闻自动池**：每日增量更新，超 365 天未提及自动移出
+
+启用指数：
+
+```yaml
+# config.yaml
+auto_universe:
+  include_indices: ["sp500", "nasdaq100"]
 ```
 
 ---
@@ -76,53 +107,142 @@ uv run python main.py --mode backtest \
 ## 项目结构
 
 ```
-signal_system_v_eps_v2/
-├── main.py                     # 运行入口
-├── config.yaml                 # 所有策略参数配置
-├── UNIVERSE.md                 # 手动股票池（直接编辑生效）
-├── strategies/
-│   ├── v_weinstein/            # Weinstein Stage 2 父策略
-│   │   └── weinstein_strategy.py
-│   └── v_eps_v2/               # Weinstein + EPS 策略
-│       └── eps_v2_strategy.py  # ← 发布重点
-├── backtest/
-│   └── engine.py               # 回测引擎
-├── signals/
-│   ├── generator.py            # 信号生成
-│   ├── positions.py            # 持仓追踪
-│   └── report.py               # Markdown 报告生成
-├── data/
-│   ├── fetcher.py              # 数据获取（Alpaca + Yahoo Finance）
-│   ├── fundamentals.py         # EPS 数据获取 + 缓存
-│   └── cache/                  # 本地缓存（不上传 Git）
-└── universe/
-    ├── manager.py             # 股票池管理
-    └── index_fetcher.py       # S&P500/Nasdaq100/Russell2000 成分股
+signal-system-oliver/
+├── main.py                            # CLI 入口（live/backtest/scan）
+├── config.yaml                        # 全局配置
+├── pyproject.toml                     # Python 项目元数据
+├── DEVELOPMENT_GUIDE.md               # ★ 详细开发文档（含架构、扩展、复现步骤）
+│
+├── data/                              # 数据层
+│   ├── fetcher.py                     # 三层缓存 + Alpaca/Yahoo/VIX
+│   ├── fundamentals.py                # EPS 数据
+│   ├── balance_sheet.py               # 资产负债表 + NCAV
+│   ├── sec_edgar.py                   # SEC XBRL
+│   └── ...
+│
+├── universe/                          # 股票池
+│   ├── manager.py                     # 合并手动+指数+自动
+│   ├── index_fetcher.py               # 指数成分股
+│   ├── alpaca_fetcher.py              # Alpaca 新闻
+│   ├── sa_scanner.py                  # SA Quant 评分
+│   └── updater.py                     # 写入 UNIVERSE.md
+│
+├── events/                            # 事件层
+│   ├── base.py                        # Event/BarEvent/SignalEvent
+│   └── queue.py                       # EventQueue
+│
+├── strategies/                        # 策略层（插件化）
+│   ├── base.py                        # StrategyBase 抽象基类
+│   ├── registry.py                    # STRATEGY_REGISTRY
+│   └── v_oliver_kell/                 # ★ 当前在线策略
+│       ├── oliver_kell_strategy.py    # 主类
+│       ├── cycle_detector.py          # 六阶段识别
+│       ├── wedge_finder.py            # 楔形检测
+│       ├── market_environment.py      # QQQ 四档状态
+│       ├── scale_in.py                # 分批建仓
+│       └── exit_manager.py            # 7 级出场
+│
+├── signals/                           # 信号输出
+│   ├── generator.py                   # 控制台 + CSV
+│   ├── report.py                      # 每日 Markdown 报告
+│   ├── oliver_kell_radar_report.py    # 雷达报告
+│   ├── watchlist_scanner.py           # Watchlist 候选
+│   └── positions.py                   # 持仓 JSON 持久化
+│
+├── backtest/                          # 回测引擎
+│   └── engine.py                      # BacktestEngine
+│
+├── tests/v_oliver_kell/               # 单元测试
+│
+├── output/                            # 运行时输出（gitignored）
+│
+├── UNIVERSE.md                        # ★ 手动股票池（唯一来源）
+├── Oliver_Kell_Victory_in_Stock_Trading.pdf  # 策略原文（gitignored，版权）
+└── run_daily.sh                       # macOS 自动运行脚本
 ```
 
 ---
 
-## 股票池
+## 添加新策略
 
-系统支持三种股票池来源，按 `config.yaml` 中的 `auto_universe` 配置自动合并：
+```python
+# strategies/vN_xxx/my_strategy.py
+from strategies.base import StrategyBase
+from events import EventQueue, SignalEvent
 
-- **手动股票池**：编辑 `UNIVERSE.md`
-- **指数成分股**：S&P 500、Nasdaq 100、Russell 2000（Wikipedia 免费数据）
-- **Alpaca 新闻**：每日增量发现
+class MyStrategy(StrategyBase):
+    strategy_id = "vN_xxx"
+    strategy_name = "我的策略"
+
+    def __init__(self, cfg, market_data, live_mode=False):
+        super().__init__(cfg, market_data)
+        self.positions = {}
+
+    def run_date(self, date, queue):
+        signals = []
+        for symbol, df in self.market_data.items():
+            # ... 你的逻辑 ...
+            # queue.put(SignalEvent.create(...))
+        return signals
+```
+
+注册到 `strategies/registry.py`，在 `config.yaml` 添加配置段即可。详见 [`HOW_TO_ADD_STRATEGY.md`](HOW_TO_ADD_STRATEGY.md)。
 
 ---
 
-## 数据说明
+## 市场环境过滤
 
-运行后会首次下载 ~5000 只股票约 10 年的历史数据（约 1-2 小时，取决于网络），
-之后每次运行仅增量更新，1-2 分钟内完成。
+系统根据 QQQ vs 20 EMA 关系自动调整仓位上限：
 
-- **行情数据**：Alpaca IEX（免费）为主，Yahoo Finance 为备用
-- **EPS 数据**：Finnhub（优先）+ Alpha Vantage（备用）
+| 环境 | 条件 | 最大仓位 | 最多信号数 |
+|------|------|---------|-----------|
+| Quality | QQQ > EMA20 × 1.01 | 190% | 10 |
+| Average | QQQ 在 EMA20 ±1% | 50% | 5 |
+| Poor | QQQ < EMA20 × 0.99 | 30% | 2 |
+| Hostile | 10 日内 8 天收跌 | 0% | 0 |
+
+---
+
+## 回测评估指标
+
+| 指标 | 及格线 |
+|------|--------|
+| 胜率 | > 40% |
+| 盈亏比 | > 1.5 |
+| 最大回撤 | < 25% |
+| 每月信号数 | 2 ~ 10 |
+| 年化收益 | > 15% |
+| 夏普比率 | > 1.0 |
+
+≥ 5/6 项达标视为策略合格。
+
+---
+
+## 文档
+
+- 📘 [**DEVELOPMENT_GUIDE.md**](DEVELOPMENT_GUIDE.md) — 完整开发文档（架构、复现、扩展、陷阱）
+- 📋 [docs/PRD_v_oliver_kell_2026-05-15_v2.md](docs/PRD_v_oliver_kell_2026-05-15_v2.md) — 产品 PRD（详细规则）
+- 📚 [docs/strategies/](docs/strategies/) — 历史策略文档
+- 🛠 [HOW_TO_ADD_STRATEGY.md](HOW_TO_ADD_STRATEGY.md) — 新策略开发指南
+
+---
+
+## 致谢
+
+- **Oliver Kell** —— 《Cycle of Price Action》理论作者
+- **Alpaca** —— 免费美股市场数据
+- **Finnhub** / **Alpha Vantage** / **Polygon** —— 财务数据
+- **SEC EDGAR** —— 完全免费的 XBRL 财务数据
 
 ---
 
 ## 免责声明
 
 本系统仅供学习和研究用途，所有输出均为技术信号，**不构成投资建议**。
-使用者自行承担投资决策风险。
+历史回测结果不代表未来表现。使用者自行承担投资决策风险。
+
+---
+
+## 许可证
+
+[MIT](LICENSE) © 2026 wubo

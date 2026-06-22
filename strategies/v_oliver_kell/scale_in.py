@@ -4,12 +4,12 @@ strategies/v_oliver_kell/scale_in.py
 分批建仓逻辑（原文 Section 6.2 Scale-In Method）：
 
 原文：
-    Batch 1 (15% position):
+    Batch 1 (25-35% Top Idea position):
     → Entry: Price supported at 20 EMA / Wedge Pop pivot
     → Stop: 1-2% below entry
     → Account risk: ~15-30bps (minimal risk)
 
-    Batch 2 (+15% = 30% total):
+    Batch 2 (+10% = 35% total for Top Idea, or +15% = 40% total for conviction):
     → Condition: Batch 1 profitable, follow-through confirmation next day
     → Simultaneously raise stop to "follow-through day" low
     → Total account risk still ~20-30bps
@@ -64,14 +64,15 @@ class ScaleInManager:
     """
     管理分批建仓逻辑。
 
-    核心规则：
-        Batch 1: 15%，Wedge Pop 突破时入场，止损 = 突破日收盘低 - 1-2%
-        Batch 2: +15%，次日确认后加仓，止损 = 确认日最低价
+    核心规则（PDF Page 69）：
+        Batch 1: 15-20% Top Idea，Wedge Pop 突破时入场，止损 = 突破日收盘低 - 1-2%
+        Batch 2: 5-10%，次日确认后加仓，止损 = 确认日最低价
         后续：可根据 Base n' Break 继续加仓
     """
 
-    BATCH1_PCT = 0.15    # 15%
-    BATCH2_PCT = 0.15    # +15% = 30% total
+    # PDF Page 69: "Initial position: 15-20% Top Idea of account"
+    BATCH1_PCT = 0.20    # 20% Top Idea（取 PDF 15-20% 区间上限）
+    BATCH2_PCT = 0.10    # 5-10% = 25-30% total（取 10% 上限）
     INITIAL_STOP_PCT = 0.02  # 2% below entry（原文 1-2%）
 
     def __init__(self):
@@ -83,7 +84,7 @@ class ScaleInManager:
         Batch 1 入场（Wedge Pop）。
 
         原文：
-            - Initial position: 15% of account
+            - Initial position: 25-35% Top Idea of account
             - Stop: 1-2% below entry
         """
         if entry_date is None:
@@ -186,16 +187,16 @@ class ScaleInManager:
         获取持仓百分比。
 
         原文：
-            Batch 1 = 15%
-            Batch 2 = +15% = 30% total
+            Batch 1 = 30% Top Idea
+            Batch 2 = +10% = 40% total for conviction names
         """
         state = self.get_batch_state(symbol)
         if state == BatchState.NONE:
             return 0.0
         elif state == BatchState.BATCH1_OPEN:
-            return self.BATCH1_PCT * 100  # 15%
+            return self.BATCH1_PCT * 100  # 30%
         elif state == BatchState.BATCH2_OPEN:
-            return (self.BATCH1_PCT + self.BATCH2_PCT) * 100  # 30%
+            return (self.BATCH1_PCT + self.BATCH2_PCT) * 100  # 40%
         return 0.0
 
     def should_add_batch2(self, symbol: str) -> bool:

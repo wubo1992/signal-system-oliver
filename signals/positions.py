@@ -29,10 +29,19 @@ signals/positions.py — 持仓状态持久化
 """
 
 import json
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from strategies.v_weinstein.weinstein_strategy import Position
+
+@dataclass
+class Position:
+    symbol: str
+    entry_price: float
+    entry_date: datetime
+    highest_price: float
+    days_held: int = 0
+    shares: float = 0.0
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 

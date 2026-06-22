@@ -412,8 +412,18 @@ class BacktestEngine:
                     market_data[benchmark] = data[benchmark]
 
         # 确定测试区间内的所有交易日
-        ref_df = next(iter(market_data.values()))
-        ref_index = ref_df.index
+        # 优先使用 US 股票的数据（不会有 US holiday 数据缺口）
+        # 如果没有 US 股票，再用第一个股票的数据
+        ref_index = None
+        us_symbols = {"SPY", "QQQ", "AAPL", "MSFT", "GOOG", "GOOGL", "AMZN", "NVDA",
+                       "META", "TSLA", "AMD", "INTC", "CRM"}
+        for sym in us_symbols:
+            if sym in market_data:
+                ref_index = market_data[sym].index
+                break
+        if ref_index is None:
+            ref_df = next(iter(market_data.values()))
+            ref_index = ref_df.index
         if ref_index.tzinfo is None:
             ref_index = ref_index.tz_localize("UTC")
 
@@ -445,9 +455,16 @@ class BacktestEngine:
             strategy = self.strategy_cls(self.strategy_config, market_data)
         queue = EventQueue()
 
+        # 确保策略的 index_symbol (如 QQQ) 在 market_data 中
+        index_symbol = self.strategy_config.get("index_symbol", "QQQ")
+        if index_symbol not in market_data:
+            idx_data = fetch([index_symbol], history_days=total_days, end_date=self.end_date)
+            if index_symbol in idx_data:
+                market_data[index_symbol] = idx_data[index_symbol]
+
         # 追踪所有交易
-        open_trades: dict[str, Trade] = {}   # symbol → 正在持有的交易
-        all_trades: list[Trade] = []          # 全部交易（含已平仓和未平仓）
+        open_trades: dict[str, list[Trade]] = {}   # symbol → 正在持有的交易列表（支持同股票多仓位）
+        all_trades: list[Trade] = []              # 全部交易（含已平仓和未平仓）
 
         for i, date in enumerate(trading_days):
             dt = date.to_pydatetime()
@@ -458,16 +475,22 @@ class BacktestEngine:
 
             for sig in signals:
                 symbol = sig.symbol
-                direction = sig.data["direction"]
+                direction = sig.data.get("direction", "")
                 reason = sig.data.get("reason", "")
                 strength = sig.data.get("strength", 0)
 
-                if direction == "buy" and symbol not in open_trades:
+                if direction == "buy":
                     entry_price = _get_close(market_data, symbol, dt, strategy)
                     if entry_price is None:
                         continue
-                    position_dollar = sig.data.get("position_dollar", 0.0)
+                    position_dollar = sig.data.get("position_dollar", self.position_size)
                     shares = position_dollar / entry_price if entry_price > 0 else 0.0
+                    sig_shares = sig.data.get("shares", 0.0)
+                    if sig_shares > 0:
+                        shares = sig_shares  # 信号指定了精确股数
+
+                    # 每个买入信号都创建新的独立交易
+                    # （不再检查是否已有持仓，同一股票可同时持有多笔独立交易）
                     trade = Trade(
                         symbol=symbol,
                         entry_date=dt,
@@ -477,10 +500,12 @@ class BacktestEngine:
                         entry_reason=reason,
                         position_dollar=position_dollar,
                     )
-                    open_trades[symbol] = trade
+                    if symbol not in open_trades:
+                        open_trades[symbol] = []
+                    open_trades[symbol].append(trade)
                     all_trades.append(trade)
 
-                    # 同步股数到策略的 positions dict（修复 shares=0.0 bug）
+                    # 同步股数到策略的 positions dict
                     if hasattr(strategy, 'positions') and symbol in strategy.positions:
                         strategy.positions[symbol].shares = shares
 
@@ -498,48 +523,32 @@ class BacktestEngine:
                             "参考止损": stop_str,
                         }], self.strategy_id)
 
-                elif direction == "buy" and symbol in open_trades:
-                    # 金字塔加仓：已有持仓时收到买入信号，追加股数
-                    add_on_price = _get_close(market_data, symbol, dt, strategy)
-                    if add_on_price is None:
+                elif direction == "sell":
+                    # 卖出信号：关闭对应股票的所有未平仓交易
+                    if symbol not in open_trades or len(open_trades[symbol]) == 0:
                         continue
-                    trade = open_trades[symbol]
-                    add_on_shares = sig.data.get("shares", trade.shares)  # 默认翻倍持股
-                    orig_shares = trade.shares
-                    new_shares = orig_shares + add_on_shares
-                    if new_shares <= 0:
-                        continue  # 防呆：shares 异常时不处理
-                    # 加权平均入场价
-                    new_entry = (trade.entry_price * orig_shares + add_on_price * add_on_shares) / new_shares
-                    trade.shares = new_shares
-                    trade.entry_price = new_entry
-                    trade.add_on_triggered = True
-                    # 更新策略侧持仓
-                    if hasattr(strategy, 'positions') and symbol in strategy.positions:
-                        strategy.positions[symbol].shares = new_shares
-                        strategy.positions[symbol].entry_price = new_entry
-
-                elif direction == "sell" and symbol in open_trades:
                     exit_price = _get_close(market_data, symbol, dt, strategy)
                     if exit_price is None:
                         continue
-                    trade = open_trades[symbol]
                     sig_shares = sig.data.get("shares", 0.0)
 
-                    if sig_shares > 0 and trade.shares > 0:
-                        # 部分平仓：检查卖出股数是否小于持仓股数
-                        if sig_shares < trade.shares:
-                            # 分级止盈：只卖出一部分
-                            closed_trade = trade.partial_close(dt, exit_price, sig_shares, reason)
-                            all_trades.append(closed_trade)
-                            # 持仓继续追踪，不从 open_trades 移除
+                    # 卖出所有未平仓交易
+                    trades_to_close = open_trades.get(symbol, [])
+                    for trade in trades_to_close:
+                        if sig_shares > 0 and trade.shares > 0:
+                            # 部分平仓
+                            if sig_shares < trade.shares:
+                                closed_trade = trade.partial_close(dt, exit_price, sig_shares, reason)
+                                all_trades.append(closed_trade)
+                            else:
+                                # 全部卖出
+                                trade.close(dt, exit_price, reason)
                         else:
-                            # 全部卖出
-                            open_trades.pop(symbol)
                             trade.close(dt, exit_price, reason)
-                    else:
-                        open_trades.pop(symbol)
-                        trade.close(dt, exit_price, reason)
+                    # 清空该股票的所有持仓
+                    open_trades[symbol] = []
+                    if hasattr(strategy, 'positions') and symbol in strategy.positions:
+                        del strategy.positions[symbol]
 
             # 进度提示（每 50 天打印一次）
             if verbose and (i + 1) % 50 == 0:
@@ -547,10 +556,12 @@ class BacktestEngine:
                 print(f"    进度：{i+1}/{len(trading_days)} 天 ({pct:.0f}%)")
 
         # 将测试结束时仍未平仓的头寸强制平仓（以最后一日收盘价）
-        for symbol, trade in list(open_trades.items()):
+        for symbol, trades in list(open_trades.items()):
             exit_price = _get_close(market_data, symbol, self.end_date, strategy)
             if exit_price is not None:
-                trade.close(self.end_date, exit_price, "回测结束强制平仓")
+                for trade in trades:
+                    if not trade.is_closed:
+                        trade.close(self.end_date, exit_price, "回测结束强制平仓")
 
         # 清空队列（不需要额外处理）
         while not queue.empty():
@@ -680,16 +691,32 @@ class BacktestEngine:
                                 'position_dollar': needed,
                             }
                             cash -= needed
-                    break
+                    # Move to next trade regardless of whether we bought or not
+                    trade_idx += 1
+                    # Continue processing trades for today (entry_date == dt_date)
+                    # but stop when we hit future entries (entry_date > dt_date)
+                    if trade_idx < len(sorted_trades):
+                        next_entry_date = _ensure_utc(sorted_trades[trade_idx].entry_date).date()
+                        if next_entry_date > dt_date:
+                            break
 
                 # 计算持仓市值
+                # 使用日历日期匹配（不用 timestamp 比较），因为不同时区的股票时间戳不同
                 pos_value = 0.0
                 for sym, pos in active_positions.items():
                     df = sliced_data.get(sym)
                     if df is not None:
-                        mask = df.index <= dt
-                        if mask.sum() >= 1:
-                            cur_price = float(df["close"][mask].iloc[-1])
+                        # 用当前交易日（dt_date）的日历日期匹配当日收盘价
+                        # df.index 是 UTC timestamps，提取日期进行比较
+                        df_dates = pd.Series([d.date() for d in df.index], index=df.index)
+                        df_today = df[df_dates == dt_date]
+                        if not df_today.empty:
+                            # 当日有数据，用当日收盘价
+                            cur_price = float(df_today["close"].iloc[-1])
+                            pos_value += cur_price * pos['shares']
+                        else:
+                            # 如果当天没有数据（e.g., 周末/节假日），用最近的一个收盘价
+                            cur_price = float(df["close"].iloc[-1])
                             pos_value += cur_price * pos['shares']
 
                 equity.iloc[i] = cash + pos_value
@@ -885,11 +912,37 @@ def _get_close(
     date: datetime,
     strategy: StrategyBase,
 ) -> float | None:
-    """获取 symbol 在 date 当天的收盘价。"""
+    """
+    获取 symbol 在 date 当天的收盘价。
+
+    yfinance 对美股返回每日两个 bar（05:00 和 14:30 UTC），
+    其中 14:30 UTC 的 bar 代表当日收盘交易。
+    而 05:00 UTC 的 bar 是前一日的盘后收盘。
+    所以 iloc[-1] 可能返回次日 05:00 的错误价格。
+
+    修复：找到与 date 日历日期匹配的最接近 bar。
+    """
     df = market_data.get(symbol)
     if df is None:
         return None
     df_sliced = strategy._slice_to_date(df, date)
     if df_sliced.empty:
         return None
-    return float(df_sliced["close"].iloc[-1])
+
+    # 找到与 date 的日历日期匹配的最后一行
+    # date 可能是带时区的 UTC 时间，我们只比较日历日期
+    if hasattr(date, 'tzinfo') and date.tzinfo is not None:
+        date_normalized = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        date_normalized = date.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+
+    # 在 sliced 数据中找到与 date 属于同一日历日的 bar
+    # 即：bar 的日期（去掉时间）== date 的日历日期
+    target_date = date_normalized.date()
+    df_with_date = df_sliced.copy()
+    df_with_date['_date_only'] = pd.Series([d.date() for d in df_with_date.index], index=df_with_date.index)
+    df_matched = df_with_date[df_with_date['_date_only'] == target_date]
+    if df_matched.empty:
+        # 没有当天数据，返回 None 让调用方跳过这笔交易
+        return None
+    return float(df_matched["close"].iloc[-1])

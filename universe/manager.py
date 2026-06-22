@@ -102,8 +102,6 @@ def get_universe(config: dict) -> list[str]:
         股票代码列表，如 ["AAPL", "GOOGL", "META", "MSFT", "NVDA"]
     """
     auto_cfg = config.get("auto_universe", {})
-    initial_lookback = auto_cfg.get("initial_lookback_days", 365)
-    max_age_days = auto_cfg.get("max_age_days", 365)
     include_indices = auto_cfg.get("include_indices", [])
 
     # 来源 A：UNIVERSE.md 手动维护的股票
@@ -112,15 +110,11 @@ def get_universe(config: dict) -> list[str]:
     # 来源 B：指数成分股（S&P 500 / Nasdaq 100，由 config 控制）
     index_symbols = get_index_symbols(include_indices) if include_indices else []
 
-    # 来源 C：Alpaca 自动股票池（新闻热门股）
-    auto_symbols = _get_auto_symbols(initial_lookback, max_age_days)
-
-    # 合并：取并集，去重，排序
-    combined = sorted(set(manual) | set(index_symbols) | set(auto_symbols))
+    # 合并：只用手动的 + 指数，不包含自动池
+    combined = sorted(set(manual) | set(index_symbols))
     print(
         f"[股票池] 最终股票池：{len(combined)} 只 "
-        f"（手动 {len(manual)} + 指数 {len(index_symbols)} + 自动 {len(auto_symbols)}，"
-        f"去重后合并）"
+        f"（手动 {len(manual)} + 指数 {len(index_symbols)}）"
     )
     return combined
 

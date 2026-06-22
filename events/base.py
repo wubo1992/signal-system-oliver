@@ -107,6 +107,9 @@ class SignalEvent(Event):
         reason: str,
         stop_loss: float | None = None,
         shares: float = 0.0,
+        position_dollar: float = 0.0,
+        cycle_stage: str | None = None,
+        current_price: float | None = None,
     ) -> "SignalEvent":
         return cls(
             type=EventType.SIGNAL,
@@ -118,5 +121,8 @@ class SignalEvent(Event):
                 "reason": reason,
                 "stop_loss": stop_loss,
                 "shares": shares,
+                "position_dollar": position_dollar,
+                "cycle_stage": cycle_stage,
+                "current_price": current_price,
             },
         )

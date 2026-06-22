@@ -13,8 +13,15 @@ venv/
 # 数据缓存（本地市场数据 + EPS，历史文件巨大，不上传）
 # ============================
 data/cache/
+data/cache_backup/
 data/universe_cache.json
 data/index_cache.json
+
+# ============================
+# 版权资料（书籍原文，不上传）
+# ============================
+Oliver_Kell_Victory_in_Stock_Trading.pdf
+pdf_preview.txt
 
 # ============================
 # 运行时输出（持仓、信号、报告）

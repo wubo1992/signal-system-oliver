@@ -151,8 +151,8 @@ class ExitManager:
         """
         decision = ExitDecision()
 
-        # 1. 跌破 20 EMA → 全出（原文最明确规则）
-        if current_price < ema20:
+        # 1. 跌破 20 EMA 超过 2% → 全出（原文 "decisively breaks below"）
+        if ema20 > 0 and current_price < ema20 * (1 - 0.02):
             decision.should_exit = True
             decision.exit_reason = ExitReason.PASSIVE_EXIT
             decision.reason_text = (

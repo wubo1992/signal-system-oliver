@@ -10,25 +10,25 @@ from typing import Optional
 
 @dataclass
 class CigarButtV1BCriteria:
-    """V1B 过滤器标准"""
+    """V1B 过滤器标准（现代化放宽版）"""
 
-    # 第一层：深度价值
-    max_p_ncav: float = 0.75
-    max_p_netnet: float = 0.85
-    max_p_b: float = 1.2
-    max_p_e: float = 15
-    max_debt_ratio: float = 0.50  # 比V1A严格
+    # 第一层：深度价值（严格烟蒂版）
+    max_p_ncav: float = 1.5       # 严格：P/NCAV < 1.5
+    max_p_netnet: float = 2.0     # 严格：P/Net-Net < 2.0
+    max_p_b: float = 1.5          # 严格：P/B < 1.5
+    max_p_e: float = 10           # 严格：P/E < 10
+    max_debt_ratio: float = 0.50  # 严格：负债率 < 50%
 
-    # 第二层：盈利质量
+    # 第二层：盈利质量（保留核心要求）
     require_positive_eps: bool = True
     require_positive_cfo: bool = True
-    min_profit_stability_years: int = 2  # 近2年至少1年盈利
-    max_revenue_decline_1y: float = 0.20  # 营收下降 < 20%
+    min_profit_stability_years: int = 1   # 改为1年（原2年）
+    max_revenue_decline_1y: float = 0.30  # 改为30%（原20%）
 
     # 第三层：流动性
-    min_market_cap: float = 100_000_000  # $1亿，比V1A高
-    max_market_cap: float = 5_000_000_000  # $50亿
-    min_avg_dollar_volume: float = 1_000_000  # 日均成交额 > $100万
+    min_market_cap: float = 50_000_000   # 改为$5000万（原1亿）
+    max_market_cap: float = 10_000_000_000  # $100亿
+    min_avg_dollar_volume: float = 200_000   # $20万（原100万）
 
 
 @dataclass

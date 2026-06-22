@@ -50,6 +50,45 @@ def _get_tag_sec(facts: dict, namespace: str, tag: str) -> Optional[float]:
     return None
 
 
+def _get_ttm_from_sec(facts: dict, namespace: str, tag: str) -> tuple[float, int]:
+    """
+    从 SEC EDGAR facts 中计算 TTM（最近4个季度之和）
+
+    返回：
+        (ttm_value, quarter_count)
+    """
+    if namespace not in facts or tag not in facts[namespace]:
+        return 0.0, 0
+
+    units = facts[namespace][tag].get("units", {})
+    records = units.get("USD", [])
+    if not records:
+        return 0.0, 0
+
+    # 按 end date 降序排序
+    sorted_records = sorted(records, key=lambda x: x.get("end", ""), reverse=True)
+
+    # 提取4个唯一季度（避免同一季度多个报告的重复计算）
+    ttm = 0.0
+    count = 0
+    seen_frames: set[str] = set()
+
+    for r in sorted_records:
+        frame = r.get("frame", "")
+        val = r.get("val", 0)
+
+        # 只取有 frame 标记的季度数据，且只取每个季度一次
+        if frame and "Q" in frame:
+            if frame not in seen_frames:
+                ttm += val
+                seen_frames.add(frame)
+                count += 1
+                if count >= 4:
+                    break
+
+    return ttm, count
+
+
 def _load_sec_edgar(symbol: str) -> Optional[dict]:
     """从 SEC EDGAR 本地缓存加载财务数据"""
     cache_path = _sec_cache_path(symbol)
@@ -349,43 +388,84 @@ def get_financials_ttm(symbol: str) -> dict:
     """
     获取 TTM（Trailing Twelve Months）财务数据
 
-    优先从 SEC EDGAR 缓存读取（已包含最新一期数据），
-    Fallback 到 Polygon API。
+    优先从 SEC EDGAR 缓存读取并计算 TTM（4季度求和），
+    Fallback 到 Polygon API（需要 API Key）。
+
+    如果无法获取 TTM，返回最新可用数据（年度或单季度）并标记 source。
 
     返回：
         {
             'net_income_ttm': float,
             'operating_cash_flow_ttm': float,
             'revenue_ttm': float,
+            'source': str,
+            'data_type': str,  # 'ttm' | 'annual' | 'quarterly'
             'error': str/None
         }
     """
     cache_path = _cache_path(symbol, "financials_ttm")
 
+    # 只有有效且来源可靠的缓存才使用
     if _is_cache_valid(cache_path, max_age_days=7):
         try:
             with open(cache_path, "rb") as f:
                 cached = pickle.load(f)
-            print(f"[FinancialsTTM] {symbol} 从缓存加载")
-            return cached
+            # 只用 SEC EDGAR TTM 缓存，Polygon 缓存可能有问题
+            if cached.get('source') == 'sec_edgar_ttm' and cached.get('error') is None:
+                print(f"[FinancialsTTM] {symbol} 从缓存加载")
+                return cached
         except Exception:
             pass
 
-    # 优先从 SEC EDGAR 缓存读取
-    sec_data = _load_sec_edgar(symbol)
-    if sec_data and sec_data.get('net_income') is not None:
-        print(f"[FinancialsTTM] {symbol} 从SEC EDGAR加载 (单季度)")
-        return {
-            'net_income_ttm': sec_data.get('net_income', 0) or 0,
-            'operating_cash_flow_ttm': sec_data.get('operating_cfo', 0) or 0,
-            'revenue_ttm': sec_data.get('revenue', 0) or 0,
-            'source': 'sec_edgar',
-            'error': None,
-        }
+    # 优先从 SEC EDGAR 缓存读取并计算 TTM
+    cache_path_sec = _sec_cache_path(symbol)
+    if cache_path_sec.exists():
+        try:
+            with open(cache_path_sec, "r") as f:
+                data = json.load(f)
 
-    # Fallback: Polygon API
+            facts = data.get("facts", {})
+            us_gaap = facts.get("us-gaap", {})
+
+            # 计算 TTM（4季度求和）
+            ni_ttm, ni_count = _get_ttm_from_sec(facts, "us-gaap", "NetIncomeLoss")
+            cfo_ttm, cfo_count = _get_ttm_from_sec(facts, "us-gaap", "NetCashProvidedByUsedInOperatingActivities")
+            rev_ttm, rev_count = _get_ttm_from_sec(facts, "us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax")
+
+            if ni_count >= 4:  # 有4个季度数据，用 TTM
+                result = {
+                    'net_income_ttm': float(ni_ttm),
+                    'operating_cash_flow_ttm': float(cfo_ttm),
+                    'revenue_ttm': float(rev_ttm),
+                    'source': 'sec_edgar_ttm',
+                    'data_type': 'ttm',
+                    'quarters_used': ni_count,
+                    'error': None,
+                }
+                _cache_ttm_result(cache_path, result, symbol, 'TTM')
+                return result
+            elif ni_count >= 1:  # 只有1-3个季度，用最新季度数据
+                # 取最新一期
+                ni_annual = _get_tag_sec(facts, "us-gaap", "NetIncomeLoss") or 0
+                cfo_annual = _get_tag_sec(facts, "us-gaap", "NetCashProvidedByUsedInOperatingActivities") or 0
+                rev_annual = _get_tag_sec(facts, "us-gaap", "RevenueFromContractWithCustomerExcludingAssessedTax") or 0
+                result = {
+                    'net_income_ttm': float(ni_annual),
+                    'operating_cash_flow_ttm': float(cfo_annual),
+                    'revenue_ttm': float(rev_annual),
+                    'source': 'sec_edgar_quarterly',
+                    'data_type': 'quarterly',
+                    'quarters_used': ni_count,
+                    'error': None,
+                }
+                _cache_ttm_result(cache_path, result, symbol, f'季度({ni_count}Q)')
+                return result
+        except Exception as e:
+            print(f"[FinancialsTTM] {symbol} SEC EDGAR读取失败: {e}")
+
+    # Fallback: Polygon API（需要有效的 API Key）
     if not POLYGON_API_KEY:
-        return {'error': 'No API Key and no SEC EDGAR cache'}
+        return {'error': f'No Polygon API Key and no valid SEC EDGAR data for {symbol}'}
 
     url = f"{POLYGON_BASE_URL}/v2/reference/financials/{symbol}"
     params = {
@@ -412,9 +492,10 @@ def get_financials_ttm(symbol: str) -> dict:
         revenue_ttm = 0.0
 
         for q in results[:4]:
-            ni = q.get('netIncomeLoss', 0) or 0
-            cfo = q.get('netCashProvidedByUsedInOperatingActivities', 0) or 0
-            rev = q.get('revenues', 0) or 0
+            # Polygon 字段名与 SEC EDGAR 不同
+            ni = q.get('netIncome', 0) or q.get('netIncomeLoss', 0) or 0
+            cfo = q.get('netCashFlowFromOperations', 0) or q.get('netCashProvidedByUsedInOperatingActivities', 0) or 0
+            rev = q.get('revenue', 0) or q.get('revenues', 0) or 0
             net_income_ttm += ni
             operating_cash_flow_ttm += cfo
             revenue_ttm += rev
@@ -424,20 +505,24 @@ def get_financials_ttm(symbol: str) -> dict:
             'operating_cash_flow_ttm': float(operating_cash_flow_ttm),
             'revenue_ttm': float(revenue_ttm),
             'source': 'polygon',
+            'data_type': 'ttm',
             'error': None,
         }
-
-        try:
-            with open(cache_path, "wb") as f:
-                pickle.dump(result, f)
-            print(f"[FinancialsTTM] {symbol} 已缓存")
-        except Exception as e:
-            print(f"[FinancialsTTM] {symbol} 缓存失败: {e}")
-
+        _cache_ttm_result(cache_path, result, symbol, 'Polygon')
         return result
 
     except Exception as e:
         return {'error': str(e)}
+
+
+def _cache_ttm_result(cache_path: Path, result: dict, symbol: str, label: str) -> None:
+    """缓存TTM结果"""
+    try:
+        with open(cache_path, "wb") as f:
+            pickle.dump(result, f)
+        print(f"[FinancialsTTM] {symbol} 从{label}缓存")
+    except Exception as e:
+        print(f"[FinancialsTTM] {symbol} 缓存失败: {e}")
 
 
 if __name__ == "__main__":
