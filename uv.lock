@@ -2378,6 +2378,11 @@ dev = [
     { name = "ruff" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "akshare", specifier = ">=1.18.47" },
@@ -2398,6 +2403,9 @@ requires-dist = [
     { name = "yfinance", specifier = ">=1.2.0" },
 ]
 provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.3" }]
 
 [[package]]
 name = "widgetsnbextension"

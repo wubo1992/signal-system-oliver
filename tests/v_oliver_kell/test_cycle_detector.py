@@ -10,10 +10,17 @@ from strategies.v_oliver_kell.cycle_detector import CycleDetector, CycleStage
 
 
 def make_daily_df(prices, volumes=None):
-    """生成测试 DataFrame（带 EMA 计算）"""
+    """生成测试 DataFrame（含 OHLC + EMA 计算）
+
+    CycleDetector.classify() 依赖 high/low 判断楔形与突破，所以测试夹具必须补齐
+    开高低 —— 真实行情数据本来就有这三列，这里按 close ±0.5% 合成。
+    """
     n = len(prices)
     idx = pd.date_range("2026-01-01", periods=n, tz="UTC")
     df = pd.DataFrame({"close": prices}, index=idx)
+    df["open"] = df["close"]
+    df["high"] = df["close"] * 1.005
+    df["low"] = df["close"] * 0.995
     if volumes:
         df["volume"] = volumes
     else:

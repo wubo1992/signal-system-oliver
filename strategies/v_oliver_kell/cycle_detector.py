@@ -135,17 +135,22 @@ class CycleDetector:
         yesterday_close = float(prev_row["close"])
 
         # === Gap Up Exhaustion (Page 26): stock extended + gap up = sell signal ===
-        daily_dist = max(
-            abs(current - ema10) / ema10,
-            abs(current - ema20) / ema20,
-        )
+        # 只在价格位于 EMA 上方（上涨趋势延伸）时才算 Exhaustion；
+        # 远离均线下方 + 跳空属于超卖反弹 (Dead Cat Bounce)，不算顶部耗尽。
+        if current > ema10 and current > ema20:
+            daily_dist = max(
+                (current - ema10) / ema10,
+                (current - ema20) / ema20,
+            )
+        else:
+            daily_dist = 0.0
         if daily_dist >= 0.10:
             # Check for gap up: today opens significantly above yesterday's close
             gap_up_pct = (current - yesterday_close) / yesterday_close
             if gap_up_pct >= 0.03:  # 3%+ gap up while extended
                 return True
 
-        # 日K：价格远离 EMA10/20 超过 10%
+        # 日K：价格远离 EMA10/20 超过 10%（仅向上偏离）
         if daily_dist < 0.10:
             return False
 
@@ -721,9 +726,9 @@ class CycleDetector:
         ema20 = float(df["close"].ewm(span=20).mean().iloc[-1])
         today_volume = float(df["volume"].iloc[-1])
 
-        # 远离 EMA（10%+，与 Exhaustion Extension 一致）
+        # 远离 EMA（8%+，与 Exhaustion Extension 一致；2026-08-14 从 10% 放宽到 8% 以增加信号频率）
         ema_dist = abs(current - ema20) / ema20
-        if ema_dist < 0.10:
+        if ema_dist < 0.08:
             return False
 
         # === 成交量检查已移除 ===
@@ -879,21 +884,127 @@ class CycleDetector:
         sma200 = float(df["close"].rolling(200).mean().iloc[-1])
         return current > sma200
 
-    # ─── RS Line（相对强度线）计算 ────────────────────────────────────
+    # ─── RS（相对强度）计算 ────────────────────────────────────
 
     def compute_rs_line(self, df: pd.DataFrame, benchmark: pd.DataFrame) -> pd.Series:
         """
-        计算相对强度线（RS Line）：个股收盘价 / 大盘（QQQ）收盘价。
+        计算相对强度（RS）：过去 20 个交易日个股涨幅 / 大盘（SPY）涨幅（倍数）。
 
-        返回：RS Line Series（百分比形式）
+        公式：
+            RS = (stock_close / stock_close_20d_ago) / (bench_close / bench_close_20d_ago)
+
+        含义（倍数形式）：
+            - RS = 1.0 ：个股与大盘涨幅相同（同步大盘）
+            - RS > 1.0 ：个股过去 20 天跑赢大盘
+            - RS < 1.0 ：个股过去 20 天跑输大盘
+
+        返回：RS Series（倍数形式，首 20 个交易日值为 1.0 兜底）
         """
-        if len(df) < 20 or len(benchmark) < 20:
+        if len(df) < 21 or len(benchmark) < 21:
             return pd.Series([1.0], index=df.index[:1])
 
-        # 对齐数据
-        aligned, _ = df.align(benchmark, join="inner")
-        rs = (df["close"] / aligned["close"]) * 100
+        # 对齐数据：df 和 benchmark 都 reindex 到共同 index
+        aligned_df, aligned_bench = df.align(benchmark, join="inner")
+        if aligned_df.empty or aligned_bench.empty or len(aligned_df) < 21:
+            return pd.Series([1.0], index=df.index[:1])
+
+        # 20 日前收盘价（shift 后，shift(20) 取 20 个交易日之前）
+        stock_close = aligned_df["close"]
+        bench_close = aligned_bench["close"]
+        stock_close_20d_ago = stock_close.shift(20)
+        bench_close_20d_ago = bench_close.shift(20)
+
+        # 各自涨幅比 = 今天 / 20 天前
+        stock_gain_ratio = stock_close / stock_close_20d_ago
+        bench_gain_ratio = bench_close / bench_close_20d_ago
+
+        # 相对强度 = 个股涨幅 / 大盘涨幅（倍数形式，不 ×100）
+        rs = stock_gain_ratio / bench_gain_ratio
+
+        # 前 20 个交易日没有 20 天前的数据 → NaN；用 1.0 兜底（即"与大盘同步"）
+        rs = rs.fillna(1.0)
         return rs
+
+    def compute_rs_line_long(self, df: pd.DataFrame, benchmark: pd.DataFrame, lookback: int = 50) -> pd.Series:
+        """
+        计算长周期相对强度（RS Long）：过去 N 个交易日个股涨幅 / 大盘涨幅（倍数）。
+
+        常用于 10 周（50 个交易日）相对强度。
+
+        公式：RS = (stock_close / stock_close_Nd_ago) / (bench_close / bench_close_Nd_ago)
+              RS = 1.0 表示与大盘同步，RS > 1.0 表示跑赢，RS < 1.0 表示跑输
+
+        返回：RS Series（倍数形式，前 lookback 个交易日值为 1.0 兜底）
+        """
+        if len(df) < lookback + 1 or len(benchmark) < lookback + 1:
+            return pd.Series([1.0], index=df.index[:1])
+
+        aligned_df, aligned_bench = df.align(benchmark, join="inner")
+        if aligned_df.empty or aligned_bench.empty or len(aligned_df) < lookback + 1:
+            return pd.Series([1.0], index=df.index[:1])
+
+        stock_close = aligned_df["close"]
+        bench_close = aligned_bench["close"]
+        stock_close_n_ago = stock_close.shift(lookback)
+        bench_close_n_ago = bench_close.shift(lookback)
+
+        stock_gain_ratio = stock_close / stock_close_n_ago
+        bench_gain_ratio = bench_close / bench_close_n_ago
+
+        rs = stock_gain_ratio / bench_gain_ratio
+        rs = rs.fillna(1.0)
+        return rs
+
+    def compute_rs_line_short(self, df: pd.DataFrame, benchmark: pd.DataFrame, lookback: int = 10) -> pd.Series:
+        """
+        计算短期相对强度（RS Short）：过去 N 个交易日个股涨幅 / 大盘涨幅（倍数）。
+
+        常用于 10 日（约 2 周）短期相对强度。
+
+        公式：RS = (stock_close / stock_close_Nd_ago) / (bench_close / bench_close_Nd_ago)
+              RS = 1.0 表示与大盘同步，RS > 1.0 表示短期跑赢，RS < 1.0 表示短期跑输
+
+        返回：RS Series（倍数形式，前 lookback 个交易日值为 1.0 兜底）
+        """
+        if len(df) < lookback + 1 or len(benchmark) < lookback + 1:
+            return pd.Series([1.0], index=df.index[:1])
+
+        aligned_df, aligned_bench = df.align(benchmark, join="inner")
+        if aligned_df.empty or aligned_bench.empty or len(aligned_df) < lookback + 1:
+            return pd.Series([1.0], index=df.index[:1])
+
+        stock_close = aligned_df["close"]
+        bench_close = aligned_bench["close"]
+        stock_close_n_ago = stock_close.shift(lookback)
+        bench_close_n_ago = bench_close.shift(lookback)
+
+        stock_gain_ratio = stock_close / stock_close_n_ago
+        bench_gain_ratio = bench_close / bench_close_n_ago
+
+        rs = stock_gain_ratio / bench_gain_ratio
+        rs = rs.fillna(1.0)
+        return rs
+
+    def compute_volume_ratio(self, df: pd.DataFrame, lookback: int = 20) -> float | None:
+        """
+        计算量比：今日成交量 / 过去 N 日均量（不含今日）。
+
+        参数：
+            df:        含 'volume' 列的 DataFrame
+            lookback:  均量窗口（默认 20）
+
+        返回：
+            浮点比例（如 1.5 表示今天量是均量的 1.5 倍），数据不足返回 None
+        """
+        if "volume" not in df.columns:
+            return None
+        if len(df) < lookback + 1:
+            return None
+        today_vol = float(df["volume"].iloc[-1])
+        avg_vol = float(df["volume"].iloc[-(lookback + 1):-1].mean())
+        if avg_vol <= 0:
+            return None
+        return today_vol / avg_vol
 
     def is_rs_leading(self, df: pd.DataFrame, benchmark: pd.DataFrame, lookback: int = 20) -> bool:
         """

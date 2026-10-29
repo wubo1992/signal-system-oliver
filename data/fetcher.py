@@ -44,6 +44,19 @@ import requests
 CACHE_DIR = Path(__file__).parent / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+# ─── 僵尸票过滤 ───────────────────────────────────────────────────
+# 实盘时，最后一根 K 线比基准落后超过这个天数的票直接踢出结果集。
+#
+# 为什么需要：Alpaca / Yahoo 都取不到数据时，增量更新会「跳过」，
+# 但旧数据仍然原样返回。于是已经退市、或 UNIVERSE 里用美股代码代号的
+# 欧洲票，会拿着几个月前的收盘价参与策略计算（THR 曾用 5/29 的价格
+# 发出做空信号）。这类票不可交易，留着只会造假。
+#
+# 为什么用 30 天：覆盖美股长假与正常停牌缺口。回测模式不做这个过滤 ——
+# 回测里每只票的最后一根 K 线就是它当时的交易数据，本来就各不相同。
+_STALE_DAYS = 30
+
+
 # ─── Yahoo Finance 备用接口 ────────────────────────────────────────
 _YF_API = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
 _HEADERS = {
@@ -73,6 +86,66 @@ def _is_index(symbol: str) -> bool:
     指数不走 Alpaca，直接走 Yahoo Finance。
     """
     return symbol.startswith("^")
+
+
+def _reference_last_date(result: dict[str, pd.DataFrame]) -> pd.Timestamp | None:
+    """
+    判定「数据陈旧」的参照日期：优先用 SPY 的最后 K 线，没有则取所有票的中位数。
+
+    用中位数而不是最大值，是为了防止某一只票的日期异常（未来日期 / 数据源错乱）
+    把参照点带偏，进而把所有正常票都判成陈旧。
+    """
+    spy = result.get("SPY")
+    if spy is not None and not spy.empty:
+        return spy.index[-1].tz_localize(None) if spy.index.tz else spy.index[-1]
+
+    dates = [
+        (df.index[-1].tz_localize(None) if df.index.tz else df.index[-1])
+        for df in result.values()
+        if not df.empty
+    ]
+    if not dates:
+        return None
+    return pd.DatetimeIndex(dates).sort_values()[len(dates) // 2]
+
+
+def drop_stale(result: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
+    """
+    从结果集中剔除「最后一根 K 线比基准落后超过 _STALE_DAYS 天」的票。
+
+    只剔除返回值，【不删除本地 pkl 缓存】—— 数据没坏，只是这只票已经
+    不在交易（或根本没有可用的数据源），缓存留着不影响判断。
+    指数（^VIX 等）不参与过滤，它们的数据源更新节奏与个股不同。
+    """
+    if not result:
+        return result
+
+    reference = _reference_last_date(result)
+    if reference is None:
+        return result
+
+    cutoff = reference - pd.Timedelta(days=_STALE_DAYS)
+    kept: dict[str, pd.DataFrame] = {}
+    dropped: list[tuple[str, pd.Timestamp]] = []
+
+    for symbol, df in result.items():
+        if df.empty or _is_index(symbol):
+            kept[symbol] = df
+            continue
+        last = df.index[-1].tz_localize(None) if df.index.tz else df.index[-1]
+        if last < cutoff:
+            dropped.append((symbol, last))
+        else:
+            kept[symbol] = df
+
+    if dropped:
+        detail = "，".join(f"{s}({d:%Y-%m-%d})" for s, d in sorted(dropped, key=lambda x: x[1]))
+        print(
+            f"[数据] 剔除僵尸票 {len(dropped)} 只（数据落后基准 "
+            f"{_STALE_DAYS} 天以上，本地缓存保留）：{detail}"
+        )
+
+    return kept
 
 
 def fetch(
@@ -229,6 +302,10 @@ def fetch(
             else:
                 # delta 为空（节假日或 API 暂无数据），使用现有本地数据
                 result[symbol] = existing_df
+
+    # 实盘剔除僵尸票：数据长期不更新的票会拿旧价格算出假信号
+    if live_mode:
+        result = drop_stale(result)
 
     print(f"[数据] 成功获取 {len(result)}/{len(symbols)} 只股票的数据")
     print(f"[数据] 总耗时: {time.time()-t0:.1f}秒")

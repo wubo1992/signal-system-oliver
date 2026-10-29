@@ -159,6 +159,15 @@ strategies:
     # 市场环境
     index_symbol: "QQQ"
 
+    # RS 基准（信号 RS 比较的标的，默认 SPY 更广市场）
+    rs_benchmark: "SPY"
+
+    # RS 短期窗口（默认 10 个交易日 ≈ 2 周）
+    rs_short_window: 10
+
+    # 量比窗口（默认 20 日均量）
+    volume_ratio_window: 20
+
     # 入场
     require_wedge_pop_first: true
 

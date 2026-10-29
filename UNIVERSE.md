@@ -9,7 +9,7 @@
 
 ---
 
-## 当前手动池总数：301 只（美股301）
+## 当前手动池总数：302 只（美股302）
 
 ---
 
@@ -108,6 +108,7 @@
 | FTV | Fortive | Oliver Kell 池 |
 | ELA | Envela | Oliver Kell 池 |
 | STX | Seagate | Oliver Kell 池 |
+| STRL | Sterling Infrastructure | Oliver Kell 池 |
 | MSFT | Microsoft | Oliver Kell 池 |
 | UNH | UnitedHealth | Oliver Kell 池 |
 | RTX | RTX | Oliver Kell 池 |

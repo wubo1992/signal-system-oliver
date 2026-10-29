@@ -1,14 +1,15 @@
 """
 signals/oliver_kell_radar_report.py — Oliver Kell 每日雷达报告
 
-7 模块分类：
+8 模块分类：
     🟢 猎物出击 (Long Entries): [Wedge Pop], [EMA Crossback], [Base n' Break] direction=buy
     🔵 乘胜追击 (Scale In): [Batch 2]
     🟡 利润收割 (Active Trim): [Extension Sell] 涨幅 > 100%
     🔴 纪律防守 (Exits): [EMA20 Break], [Hard Stop 8%], [Ignite Bar Stop]
     🦅 趋势逆转 (Trend Reversal): [Wedge Drop], [Failed Breakout], [Time Stop], [3x Trapped]
+    🐂 底部机会 (Reversal Bottom): [Reversal Extension]
     🦅 放空出击 (Short Entries): [Wedge Drop Short], [Exhaustion Short]
-    🔭 前瞻观察池 (Watchlist): direction=watch OR [Reversal Extension], [Base Tightening]
+    🔭 前瞻观察池 (Watchlist): direction=watch OR [Base Tightening]
 """
 
 import re
@@ -75,13 +76,113 @@ def _record_to_dict(r) -> dict:
             "强度(1-5)": r.data.get("strength", 0),
             "参考止损": r.data.get("stop_loss"),
             "日期": r.timestamp.strftime("%Y-%m-%d") if hasattr(r, "timestamp") else "",
+            "RS (10D)": r.data.get("rs_value_10d"),
+            "RS (20D)": r.data.get("rs_value"),
+            "RS (10W)": r.data.get("rs_value_10w"),
+            "量比": r.data.get("volume_ratio"),
+            "RS评级": r.data.get("rs_rating"),
+            "RS倍数": r.data.get("rs_ratio"),
         }
     return {}
 
 
+def _format_rs(rs_value) -> str:
+    """Render RS 数值（倍数形式：1.0329 = 跑赢大盘 3.29%）。"""
+    if rs_value is None:
+        return "—"
+    try:
+        return f"{float(rs_value):.4f}"
+    except (TypeError, ValueError):
+        return str(rs_value) if rs_value != "" else "—"
+
+
+def _format_rs_triple(r) -> tuple[str, str, str]:
+    """同时取 10D、20D 和 10W RS 数值（兼容 dict/SignalEvent）。"""
+    if hasattr(r, "data"):
+        rs_10d = r.data.get("rs_value_10d")
+        rs_20d = r.data.get("rs_value")
+        rs_10w = r.data.get("rs_value_10w")
+    else:
+        rs_10d = r.get("RS (10D)", r.get("rs_value_10d"))
+        rs_20d = r.get("RS (20D)", r.get("rs_value"))
+        rs_10w = r.get("RS (10W)", r.get("rs_value_10w"))
+    return _format_rs(rs_10d), _format_rs(rs_20d), _format_rs(rs_10w)
+
+
+def _format_rs_pair(r) -> tuple[str, str]:
+    """同时取 20D 和 10W RS 数值（兼容 dict/SignalEvent）。"""
+    if hasattr(r, "data"):
+        rs_20d = r.data.get("rs_value")
+        rs_10w = r.data.get("rs_value_10w")
+    else:
+        rs_20d = r.get("RS (20D)", r.get("rs_value"))
+        rs_10w = r.get("RS (10W)", r.get("rs_value_10w"))
+    return _format_rs(rs_20d), _format_rs(rs_10w)
+
+
+def _format_oneil_pair(r) -> tuple[str, str]:
+    """同时取 O'Neil RS 评级（1-99 百分位）与 RS 倍数（vs SPY 252 日）。"""
+    if hasattr(r, "data"):
+        rating = r.data.get("rs_rating")
+        mult = r.data.get("rs_ratio")
+    else:
+        rating = r.get("RS评级")
+        mult = r.get("RS倍数")
+    rating_str = "—"
+    if rating is not None:
+        try:
+            rating_str = f"{int(float(rating))}"
+        except (TypeError, ValueError):
+            rating_str = str(rating)
+    return rating_str, _format_rs(mult)
+
+
+def _format_vol(vol) -> str:
+    """Render 量比（兼容 None/int/float/str）。"""
+    if vol is None:
+        return "—"
+    try:
+        return f"{float(vol):.1f}x"
+    except (TypeError, ValueError):
+        s = str(vol)
+        return s if s else "—"
+
+
+def _dedupe_records(records: list) -> list:
+    """按 (股票, 信号) 去重，保留第一次出现的记录。
+
+    修复 main.py 同时传入 records 和 watchlist_records 导致同一信号出现两次的 bug。
+    兼容 dict 和 SignalEvent；将中英信号值（"观望"/"watch"）归一化为同一 canonical 字符串。
+    """
+    # canonical 归一化：dict 记录用中文（"观望"/"买入"/"卖出"/"做空"），
+    # SignalEvent 用英文（"watch"/"buy"/"sell"/"short"），按类映射到同一 key
+    _DIRECTION_CANONICAL = {
+        "观望": "watch", "watch": "watch",
+        "买入": "buy", "buy": "buy",
+        "卖出": "sell", "sell": "sell",
+        "做空": "short", "short": "short",
+    }
+    seen: set = set()
+    out: list = []
+    for r in records:
+        if hasattr(r, "data"):
+            symbol = getattr(r, "symbol", "?")
+            signal_raw = (r.data or {}).get("direction", "?")
+        else:
+            symbol = r.get("股票", r.get("symbol", "?"))
+            signal_raw = r.get("信号", r.get("direction", "?"))
+        signal = _DIRECTION_CANONICAL.get(signal_raw, signal_raw)
+        key = (symbol, signal)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(r)
+    return out
+
+
 def categorize_signals(records: list) -> dict[str, list[dict]]:
     """
-    将信号记录分类到 6 个模块。
+    将信号记录分类到 8 个模块。
 
     参数：
         records: process_signals() 返回的信号列表（dict 或 SignalEvent）
@@ -95,6 +196,7 @@ def categorize_signals(records: list) -> dict[str, list[dict]]:
         "ACTIVE_TRIM": [],       # 🟡 利润收割
         "PASSIVE_EXIT": [],      # 🔴 纪律防守
         "TREND_REVERSAL": [],    # 🦅 趋势逆转
+        "REVERSAL_BOTTOM": [],   # 🐂 底部机会 (Reversal Extension)
         "WATCHLIST": [],         # 🔭 前瞻观察池
         "SHORT_ENTRIES": [],     # 🦅 放空出击 (Short Entries)
     }
@@ -106,8 +208,13 @@ def categorize_signals(records: list) -> dict[str, list[dict]]:
         cycle_stage = rec.get("cycle_stage", parse_reason_tag(reason))
         signal_type = rec.get("信号", "")
 
-        # Watchlist / 观望方向
-        if direction == "watch" or "Reversal Extension" in reason or "Base Tightening" in reason:
+        # Reversal Extension → 底部机会（独立模块）
+        if cycle_stage == "reversal_extension" or "Reversal Extension" in reason:
+            modules["REVERSAL_BOTTOM"].append(rec)
+            continue
+
+        # Watchlist / 观望方向（base_tightening 等）
+        if direction == "watch" or "Base Tightening" in reason:
             modules["WATCHLIST"].append(rec)
             continue
 
@@ -184,7 +291,7 @@ def generate_radar_report(
     strategy_name: str,
 ) -> Path:
     """
-    生成 6 模块雷达报告，保存到 output/{strategy_id}/YYYY-MM-DD/雷达_{strategy_name}_YYYY-MM-DD.md
+    生成 8 模块雷达报告，保存到 output/{strategy_id}/YYYY-MM-DD/雷达_{strategy_name}_YYYY-MM-DD.md
 
     参数：
         today_records: 今天新产生的信号
@@ -203,8 +310,8 @@ def generate_radar_report(
     day_dir.mkdir(parents=True, exist_ok=True)
     report_path = day_dir / f"雷达_{strategy_name}_{today_str}.md"
 
-    # 合并所有信号
-    all_records = list(today_records) + list(watchlist_records)
+    # 合并所有信号（按 (股票, 信号) 去重，避免 watchlist 重复传入造成重复行）
+    all_records = _dedupe_records(list(today_records) + list(watchlist_records))
 
     # 分类
     modules = categorize_signals(all_records)
@@ -234,21 +341,32 @@ def print_radar_console(
         # 📈 Oliver Kell Daily Radar Report - 2026-05-11
 
         ## 🟢 猎物出击 (Long Entries)
-        | Ticker | Signal | Action | Stop Loss | Context |
+        | Ticker | Strength | RS | Vol Ratio | Action | Stop Loss | Context |
 
         ## 🔵 乘胜追击 (Scale In)
+        | Ticker | RS | Vol Ratio | Action | Stop Loss | Context |
 
         ## 🟡 利润收割 (Active Trim)
+        | Ticker | RS | Vol Ratio | Gain | Context |
 
         ## 🔴 纪律防守 (Exits)
+        | Ticker | RS | Vol Ratio | Exit Reason | Context |
 
         ## 🦅 趋势逆转 (Reversal & Short)
+        | Ticker | RS | Vol Ratio | Reversal Type | Context |
+
+        ## 🐂 底部机会 (Reversal Bottom)
+        | Ticker | RS | Dist from EMA20 | Cum Rebound (since bottom) | Vol Ratio | Stop | Context |
+
+        ## 🦅 放空出击 (Short Entries)
+        | Ticker | RS | Vol Ratio | Signal | Action | Stop Loss | Context |
 
         ## 🔭 前瞻观察池 (Watchlist)
+        | Ticker | RS | Vol Ratio | Stage | Context |
     """
     today_str = datetime.now().strftime("%Y-%m-%d")
 
-    all_records = list(records) + list(watchlist)
+    all_records = _dedupe_records(list(records) + list(watchlist))
     modules = categorize_signals(all_records)
 
     lines: list[str] = []
@@ -262,18 +380,22 @@ def print_radar_console(
     entries = modules["LONG_ENTRIES"]
     if entries:
         lines.append("")
-        lines.append("| Ticker | Signal | Action | Stop Loss | Context |")
-        lines.append("|--------|--------|--------|----------|--------|")
+        lines.append("| Ticker | Strength | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Action | Stop Loss | Context |")
+        lines.append("|--------|----------|--------|--------|--------|--------|--------|-----------|--------|----------|---------|")
         for r in sorted(entries, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
             ticker = r.get("股票", r.get("symbol", "?"))
             signal = r.get("信号", r.get("direction", "?"))
             strength = r.get("强度(1-5)", r.get("strength", "?"))
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             # 提取简短 context
             context = _short_context(reason)
             action = "Buy" if signal in ("买入", "buy") else "Watch"
-            lines.append(f"| **{ticker}** | {signal} | {action} | {stop_loss} | {context} |")
+            stars = "★" * int(strength) + "☆" * (5 - int(strength)) if isinstance(strength, int) else strength
+            lines.append(f"| **{ticker}** | {stars} | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | {action} | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无新增猎物出击信号。")
     lines.append("")
@@ -283,14 +405,17 @@ def print_radar_console(
     scale_in = modules["SCALE_IN"]
     if scale_in:
         lines.append("")
-        lines.append("| Ticker | Signal | Action | Stop Loss | Context |")
-        lines.append("|--------|--------|--------|----------|--------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Action | Stop Loss | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|--------|----------|---------|")
         for r in scale_in:
             ticker = r.get("股票", r.get("symbol", "?"))
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | Scale-In | Add | {stop_loss} | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | Add | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无乘胜追击信号。")
     lines.append("")
@@ -300,15 +425,18 @@ def print_radar_console(
     trim = modules["ACTIVE_TRIM"]
     if trim:
         lines.append("")
-        lines.append("| Ticker | Gain | Action | Context |")
-        lines.append("|--------|------|--------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Gain | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|------|---------|")
         for r in trim:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             gain_match = re.search(r'\+\-?[\d.]+%', reason)
             gain = gain_match.group() if gain_match else "—"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | {gain} | Trim | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | {gain} | {context} |")
     else:
         lines.append("> 今日无利润收割信号。")
     lines.append("")
@@ -318,15 +446,18 @@ def print_radar_console(
     exits = modules["PASSIVE_EXIT"]
     if exits:
         lines.append("")
-        lines.append("| Ticker | Exit Reason | Context |")
-        lines.append("|--------|-------------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Exit Reason | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|-------------|---------|")
         for r in exits:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             # 提取退出原因标签
             tag = parse_reason_tag(reason) or "exit"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 今日无纪律防守信号。")
     lines.append("")
@@ -336,16 +467,47 @@ def print_radar_console(
     reversal = modules["TREND_REVERSAL"]
     if reversal:
         lines.append("")
-        lines.append("| Ticker | Reversal Type | Context |")
-        lines.append("|--------|---------------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Reversal Type | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|---------------|---------|")
         for r in reversal:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             tag = parse_reason_tag(reason) or "reversal"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 今日无趋势逆转信号。")
+    lines.append("")
+
+    # ── 🐂 底部机会 (Reversal Bottom) ──────────────
+    lines.append("## 🐂 底部机会 (Reversal Bottom)")
+    reversal_bottom = modules["REVERSAL_BOTTOM"]
+    if reversal_bottom:
+        lines.append("")
+        lines.append("> 最近20个交易日内曾低于 EMA20 10% 以上，累计反弹 ≥10% + 当日反弹 ≥3% 的底部观察股，等待 Wedge Pop 确认。")
+        lines.append("")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Dist from EMA20 | Cum Rebound (since bottom) | Vol Ratio | Stop | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------------|------------------------------|-----------|------|---------|")
+        for r in sorted(reversal_bottom, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
+            ticker = r.get("股票", r.get("symbol", "?"))
+            stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
+            reason = r.get("触发原因", r.get("reason", ""))
+            # 从 reason 提取数值
+            dist_match = re.search(r'Current EMA20 distance:\s*([+-]?[\d.]+)%', reason)
+            snap_match = re.search(r'Cum rebound \(since bottom (\d+)d ago\):\s+\+?([\d.]+)%', reason)
+            vol_match = re.search(r'vol\s+([\d.]+)x', reason)
+            dist = f"{dist_match.group(1)}%" if dist_match else "—"
+            snap = f"+{snap_match.group(2)}% ({snap_match.group(1)}d)" if snap_match else "—"
+            vol = f"{vol_match.group(1)}x" if vol_match else "—"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            context = _short_context(reason)
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {dist} | {snap} | {vol} | {stop_loss} | {context} |")
+    else:
+        lines.append("> 今日无底部机会信号。")
     lines.append("")
 
     # ── 🦅 放空出击 ────────────────────────────────
@@ -353,17 +515,20 @@ def print_radar_console(
     short_entries = modules["SHORT_ENTRIES"]
     if short_entries:
         lines.append("")
-        lines.append("| Ticker | Signal | Action | Stop Loss | Context |")
-        lines.append("|--------|--------|--------|----------|--------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Signal | Action | Stop Loss | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|--------|--------|----------|---------|")
         for r in sorted(short_entries, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
             ticker = r.get("股票", r.get("symbol", "?"))
             signal = r.get("信号", r.get("direction", "?"))
             strength = r.get("强度(1-5)", r.get("strength", "?"))
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
             action = "Short" if signal in ("做空", "short") else "Watch"
-            lines.append(f"| **{ticker}** | {signal} | {action} | {stop_loss} | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | {signal} | {action} | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无放空出击信号。")
     lines.append("")
@@ -373,14 +538,17 @@ def print_radar_console(
     watchlist_items = modules["WATCHLIST"]
     if watchlist_items:
         lines.append("")
-        lines.append("| Ticker | Stage | Context |")
-        lines.append("|--------|-------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Stage | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|-------|---------|")
         for r in watchlist_items:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             tag = parse_reason_tag(reason) or "watch"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 观察池为空，市场未出现明显机会。")
     lines.append("")
@@ -417,8 +585,8 @@ def _build_radar_report(
     entries = modules["LONG_ENTRIES"]
     if entries:
         lines.append("")
-        lines.append("| Ticker | Strength | Action | Stop Loss | Context |")
-        lines.append("|--------|----------|--------|----------|---------|")
+        lines.append("| Ticker | Strength | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Action | Stop Loss | Context |")
+        lines.append("|--------|----------|--------|--------|--------|--------|--------|-----------|--------|----------|---------|")
         for r in sorted(entries, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
             ticker = r.get("股票", r.get("symbol", "?"))
             strength = r.get("强度(1-5)", r.get("strength", "?"))
@@ -426,7 +594,10 @@ def _build_radar_report(
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | {stars} | Buy | {stop_loss} | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {stars} | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | Buy | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无新增猎物出击信号。")
     lines.append("")
@@ -436,14 +607,17 @@ def _build_radar_report(
     scale_in = modules["SCALE_IN"]
     if scale_in:
         lines.append("")
-        lines.append("| Ticker | Action | Stop Loss | Context |")
-        lines.append("|--------|--------|----------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Action | Stop Loss | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|--------|----------|---------|")
         for r in scale_in:
             ticker = r.get("股票", r.get("symbol", "?"))
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | Scale-In | {stop_loss} | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | Scale-In | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无乘胜追击信号。")
     lines.append("")
@@ -453,15 +627,18 @@ def _build_radar_report(
     trim = modules["ACTIVE_TRIM"]
     if trim:
         lines.append("")
-        lines.append("| Ticker | Gain | Context |")
-        lines.append("|--------|------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Gain | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|------|---------|")
         for r in trim:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             gain_match = re.search(r'\+\-?[\d.]+%', reason)
             gain = gain_match.group() if gain_match else "—"
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | {gain} | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | {gain} | {context} |")
     else:
         lines.append("> 今日无利润收割信号。")
     lines.append("")
@@ -471,14 +648,17 @@ def _build_radar_report(
     exits = modules["PASSIVE_EXIT"]
     if exits:
         lines.append("")
-        lines.append("| Ticker | Exit Reason | Context |")
-        lines.append("|--------|-------------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Exit Reason | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|-------------|---------|")
         for r in exits:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             tag = parse_reason_tag(reason) or "exit"
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 今日无纪律防守信号。")
     lines.append("")
@@ -488,16 +668,47 @@ def _build_radar_report(
     reversal = modules["TREND_REVERSAL"]
     if reversal:
         lines.append("")
-        lines.append("| Ticker | Reversal Type | Context |")
-        lines.append("|--------|---------------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Reversal Type | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|---------------|---------|")
         for r in reversal:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             tag = parse_reason_tag(reason) or "reversal"
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 今日无趋势逆转信号。")
+    lines.append("")
+
+    # ── 🐂 底部机会 (Reversal Bottom) ──────────────
+    lines.append("## 🐂 底部机会 (Reversal Bottom)")
+    reversal_bottom = modules["REVERSAL_BOTTOM"]
+    if reversal_bottom:
+        lines.append("")
+        lines.append("> 最近20个交易日内曾低于 EMA20 10% 以上，累计反弹 ≥10% + 当日反弹 ≥3% 的底部观察股，等待 Wedge Pop 确认。")
+        lines.append("")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Dist from EMA20 | Cum Rebound (since bottom) | Vol Ratio | Stop | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------------|------------------------------|-----------|------|---------|")
+        for r in sorted(reversal_bottom, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
+            ticker = r.get("股票", r.get("symbol", "?"))
+            stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
+            reason = r.get("触发原因", r.get("reason", ""))
+            # 从 reason 提取数值
+            dist_match = re.search(r'Current EMA20 distance:\s*([+-]?[\d.]+)%', reason)
+            snap_match = re.search(r'Cum rebound \(since bottom (\d+)d ago\):\s+\+?([\d.]+)%', reason)
+            vol_match = re.search(r'vol\s+([\d.]+)x', reason)
+            dist = f"{dist_match.group(1)}%" if dist_match else "—"
+            snap = f"+{snap_match.group(2)}% ({snap_match.group(1)}d)" if snap_match else "—"
+            vol = f"{vol_match.group(1)}x" if vol_match else "—"
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            context = _short_context(reason)
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {dist} | {snap} | {vol} | {stop_loss} | {context} |")
+    else:
+        lines.append("> 今日无底部机会信号。")
     lines.append("")
 
     # ── 🦅 放空出击 ────────────────────────────────
@@ -505,17 +716,19 @@ def _build_radar_report(
     short_entries = modules["SHORT_ENTRIES"]
     if short_entries:
         lines.append("")
-        lines.append("| Ticker | Signal | Action | Stop Loss | Context |")
-        lines.append("|--------|--------|--------|----------|--------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Signal | Action | Stop Loss | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|--------|--------|----------|---------|")
         for r in sorted(short_entries, key=lambda x: -int(x.get("强度(1-5)", x.get("strength", 0)))):
             ticker = r.get("股票", r.get("symbol", "?"))
             signal = r.get("信号", r.get("direction", "?"))
-            strength = r.get("强度(1-5)", r.get("strength", "?"))
             stop_loss = r.get("参考止损", r.get("stop_loss", "—"))
             reason = r.get("触发原因", r.get("reason", ""))
             context = _short_context(reason)
             action = "Short" if signal in ("做空", "short") else "Watch"
-            lines.append(f"| **{ticker}** | {signal} | {action} | {stop_loss} | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | {signal} | {action} | {stop_loss} | {context} |")
     else:
         lines.append("> 今日无放空出击信号。")
     lines.append("")
@@ -525,14 +738,17 @@ def _build_radar_report(
     watchlist_items = modules["WATCHLIST"]
     if watchlist_items:
         lines.append("")
-        lines.append("| Ticker | Stage | Context |")
-        lines.append("|--------|-------|---------|")
+        lines.append("| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Stage | Context |")
+        lines.append("|--------|--------|--------|--------|--------|--------|-----------|-------|---------|")
         for r in watchlist_items:
             ticker = r.get("股票", r.get("symbol", "?"))
             reason = r.get("触发原因", r.get("reason", ""))
             tag = parse_reason_tag(reason) or "watch"
             context = _short_context(reason)
-            lines.append(f"| **{ticker}** | [{tag}] | {context} |")
+            rs_10d_str, rs_str, rs_10w_str = _format_rs_triple(r)
+            rating_str, mult_str = _format_oneil_pair(r)
+            vol_str = _format_vol(r.get("量比", r.get("volume_ratio")))
+            lines.append(f"| **{ticker}** | {rs_10d_str} | {rs_str} | {rs_10w_str} | {rating_str} | {mult_str} | {vol_str} | [{tag}] | {context} |")
     else:
         lines.append("> 观察池为空，市场未出现明显机会。")
     lines.append("")

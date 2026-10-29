@@ -87,9 +87,13 @@ class OliverKellStrategy(StrategyBase):
         strategy_config: dict,
         market_data: dict[str, pd.DataFrame],
         live_mode: bool = False,
+        oneil_rs_map: dict[str, tuple[int | None, float | None]] | None = None,
     ) -> None:
         super().__init__(strategy_config, market_data)
         self.live_mode = live_mode
+
+        # O'Neil RS 评级横截面表（由 oneil_rs.compute_oneil_rs_map 预先算好）
+        self._oneil_rs_map = oneil_rs_map or {}
 
         # 子模块
         self.cycle_detector = CycleDetector(
@@ -177,6 +181,115 @@ class OliverKellStrategy(StrategyBase):
             df["EMA10"] = df["close"].ewm(span=10).mean()
             df["EMA20"] = df["close"].ewm(span=20).mean()
         return df
+
+    def _get_rs_benchmark_df(self) -> pd.DataFrame:
+        """获取 RS 基准（默认 SPY）的行情数据。"""
+        benchmark = self.cfg.get("rs_benchmark", "SPY")
+        return self.market_data.get(benchmark, pd.DataFrame()).copy()
+
+    def _compute_signal_metrics(self, df: pd.DataFrame) -> tuple[float | None, float | None, float | None, float | None]:
+        """
+        计算信号层统一的四个关键指标：(RS 10日, RS 20日, RS 10周, 量比)。
+
+        返回：
+            (rs_value_10d, rs_value_20d, rs_value_10w, volume_ratio) — 任一指标数据不足时返回 None
+        """
+        rs_value_10d: float | None = None
+        rs_value_20d: float | None = None
+        rs_value_10w: float | None = None
+        vol_ratio: float | None = None
+
+        benchmark = self._get_rs_benchmark_df()
+        short_window = self.cfg.get("rs_short_window", 10)
+        # RS 10D（短期窗口，默认 10 个交易日 ≈ 2 周）
+        if not benchmark.empty and len(benchmark) >= short_window + 5 and len(df) >= short_window + 5:
+            try:
+                rs_series_short = self.cycle_detector.compute_rs_line_short(df, benchmark, lookback=short_window)
+                if not rs_series_short.empty:
+                    rs_value_10d = float(rs_series_short.iloc[-1])
+            except Exception:
+                rs_value_10d = None
+
+        # RS 20D（默认 20 日窗口）
+        if not benchmark.empty and len(benchmark) >= 25 and len(df) >= 25:
+            try:
+                rs_series = self.cycle_detector.compute_rs_line(df, benchmark)
+                if not rs_series.empty:
+                    rs_value_20d = float(rs_series.iloc[-1])
+            except Exception:
+                rs_value_20d = None
+
+        # RS 10W（10 周 ≈ 50 个交易日）
+        if not benchmark.empty and len(benchmark) >= 55 and len(df) >= 55:
+            try:
+                rs_series_long = self.cycle_detector.compute_rs_line_long(df, benchmark, lookback=50)
+                if not rs_series_long.empty:
+                    rs_value_10w = float(rs_series_long.iloc[-1])
+            except Exception:
+                rs_value_10w = None
+
+        try:
+            vr = self.cycle_detector.compute_volume_ratio(df, lookback=self.cfg.get("volume_ratio_window", 20))
+            if vr is not None:
+                vol_ratio = float(vr)
+        except Exception:
+            vol_ratio = None
+
+        return rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio
+
+    @staticmethod
+    def _format_rs_note(rs_value: float | None) -> str:
+        if rs_value is None:
+            return ""
+        try:
+            return f" | [RS] {rs_value:.4f}"
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _format_rs_long_note(rs_value: float | None) -> str:
+        if rs_value is None:
+            return ""
+        try:
+            return f" | [RS-10W] {rs_value:.4f}"
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _format_rs_short_note(rs_value: float | None) -> str:
+        if rs_value is None:
+            return ""
+        try:
+            return f" | [RS-10D] {rs_value:.4f}"
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _format_vol_note(vol_ratio: float | None) -> str:
+        if vol_ratio is None:
+            return ""
+        try:
+            return f" | [Vol] {vol_ratio:.1f}x"
+        except Exception:
+            return ""
+
+    def _get_oneil_rs(self, symbol: str) -> tuple[int | None, float | None]:
+        """取 O'Neil RS 评级（1-99 百分位）与 RS 倍数（财富指数之比 vs SPY）。"""
+        return self._oneil_rs_map.get(symbol, (None, None))
+
+    @staticmethod
+    def _format_oneil_rs_note(rs_rating: int | None, rs_ratio: float | None) -> str:
+        if rs_rating is None and rs_ratio is None:
+            return ""
+        parts = []
+        if rs_rating is not None:
+            parts.append(f" | [RS-Rating] {rs_rating}")
+        if rs_ratio is not None:
+            try:
+                parts.append(f" | [RS-Mult] {rs_ratio:.4f}")
+            except Exception:
+                pass
+        return "".join(parts)
 
     def _check_exits(self, date: datetime, market_state: MarketState) -> list[SignalEvent]:
         """检查所有持仓的出场信号
@@ -622,13 +735,22 @@ class OliverKellStrategy(StrategyBase):
                 dist_to_ema20 = (current_price - ema20) / ema20 * 100
                 daily_dist_pct = min(dist_to_ema10, dist_to_ema20)
 
+                rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df_to_date)
+                metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
+
                 sig = SignalEvent.create(
                     symbol=symbol,
                     timestamp=date,
                     direction="short",
                     strength=5,
                     reason=(
-                        f"[Wedge Drop Short] Entry | "
+                        f"[Wedge Drop Short] Entry{metric_note} | "
                         f"[EMA] 10={ema10:.1f}, 20={ema20:.1f} | "
                         f"[偏离EMA] {daily_dist_pct:.1f}% | "
                         f"[Price] ${current_price:.2f} | "
@@ -639,6 +761,12 @@ class OliverKellStrategy(StrategyBase):
                     cycle_stage="wedge_drop_short",
                     current_price=current_price,
                 )
+                sig.data["rs_value_10d"] = rs_value_10d
+                sig.data["rs_value"] = rs_value_20d
+                sig.data["rs_value_10w"] = rs_value_10w
+                sig.data["volume_ratio"] = vol_ratio
+                sig.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+                sig.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
                 signals.append(sig)
                 continue
 
@@ -664,13 +792,22 @@ class OliverKellStrategy(StrategyBase):
                     dist_to_ema20 = (current_price - ema20) / ema20 * 100
                     daily_dist_pct = max(dist_to_ema10, dist_to_ema20)
 
+                    rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df_to_date)
+                    metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
+
                     sig = SignalEvent.create(
                         symbol=symbol,
                         timestamp=date,
                         direction="short",
                         strength=4,
                         reason=(
-                            f"[Exhaustion Short] Entry | "
+                            f"[Exhaustion Short] Entry{metric_note} | "
                             f"[EMA] 10={ema10:.1f}, 20={ema20:.1f} | "
                             f"[偏离EMA] {daily_dist_pct:.1f}% | "
                             f"[Gap Up] {gap_up_pct*100:.1f}% | "
@@ -681,6 +818,12 @@ class OliverKellStrategy(StrategyBase):
                         cycle_stage="exhaustion_short",
                         current_price=current_price,
                     )
+                    sig.data["rs_value_10d"] = rs_value_10d
+                    sig.data["rs_value"] = rs_value_20d
+                    sig.data["rs_value_10w"] = rs_value_10w
+                    sig.data["volume_ratio"] = vol_ratio
+                    sig.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+                    sig.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
                     signals.append(sig)
 
         # 按信号强度排序
@@ -778,10 +921,20 @@ class OliverKellStrategy(StrategyBase):
             return None  # 没有有效楔形
 
         # === RS Line 检查：RS Line 开始领先市场 ===
+        # rs_leading 仅做内部判断使用；对外输出 RS 数值与量比
         rs_leading = False
         if qqq_df is not None and len(qqq_df) >= 20:
             rs_leading = self.cycle_detector.is_rs_leading(df, qqq_df)
-        rs_note = " RS=leading" if rs_leading else ""
+
+        # 计算 RS 数值 + 量比（用于 reason 与 SignalEvent.data）
+        rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df)
+        metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
 
         # 突破价位 = 楔形上轨（用于 Failed Breakout 检测）
         breakout_price = wedge_info["wedge_upper"]
@@ -817,12 +970,12 @@ class OliverKellStrategy(StrategyBase):
             self.scale_in.on_wedge_pop(symbol, close, stop, date)
 
         reason = (
-            f"[Wedge Pop] Best entry{rs_note} | "
+            f"[Wedge Pop] Best entry{metric_note} | "
             f"[EMA] 10={ema10:.1f}, 20={ema20:.1f} | "
             f"[Stage] {stage.value}"
         )
 
-        return SignalEvent.create(
+        event = SignalEvent.create(
             symbol=symbol,
             timestamp=date,
             direction="buy",
@@ -833,6 +986,13 @@ class OliverKellStrategy(StrategyBase):
             cycle_stage="wedge_pop",
             current_price=close,
         )
+        event.data["rs_value_10d"] = rs_value_10d
+        event.data["rs_value"] = rs_value_20d
+        event.data["rs_value_10w"] = rs_value_10w
+        event.data["volume_ratio"] = vol_ratio
+        event.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+        event.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
+        return event
 
     def _handle_ema_crossback(
         self,
@@ -878,13 +1038,22 @@ class OliverKellStrategy(StrategyBase):
             self.positions[symbol] = position
             self.scale_in.on_wedge_pop(symbol, close, stop, date)
 
+        rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df)
+        metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
+
         reason = (
-            f"[EMA Crossback] Entry | "
+            f"[EMA Crossback] Entry{metric_note} | "
             f"[EMA] 10={ema10:.1f}, 20={ema20:.1f} | "
             f"[Stage] {stage.value}"
         )
 
-        return SignalEvent.create(
+        event = SignalEvent.create(
             symbol=symbol,
             timestamp=date,
             direction="buy",
@@ -895,6 +1064,13 @@ class OliverKellStrategy(StrategyBase):
             cycle_stage="ema_crossback",
             current_price=close,
         )
+        event.data["rs_value_10d"] = rs_value_10d
+        event.data["rs_value"] = rs_value_20d
+        event.data["rs_value_10w"] = rs_value_10w
+        event.data["volume_ratio"] = vol_ratio
+        event.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+        event.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
+        return event
 
     def _handle_base_n_break(
         self,
@@ -943,14 +1119,23 @@ class OliverKellStrategy(StrategyBase):
             self.positions[symbol] = position
             self.scale_in.on_wedge_pop(symbol, close, stop, date)
 
+        rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df)
+        metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
+
         reason = (
-            f"[Base n' Break] Entry | "
+            f"[Base n' Break] Entry{metric_note} | "
             f"[Base Low] ${base_low:.2f} | "
             f"[Stage] {stage.value}"
         )
 
         # Base n' Break 独立买入，每笔2000美元
-        return SignalEvent.create(
+        event = SignalEvent.create(
             symbol=symbol,
             timestamp=date,
             direction="buy",
@@ -961,6 +1146,13 @@ class OliverKellStrategy(StrategyBase):
             cycle_stage="base_n_break",
             current_price=close,
         )
+        event.data["rs_value_10d"] = rs_value_10d
+        event.data["rs_value"] = rs_value_20d
+        event.data["rs_value_10w"] = rs_value_10w
+        event.data["volume_ratio"] = vol_ratio
+        event.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+        event.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
+        return event
 
     def _handle_variant_pattern(
         self,
@@ -1001,13 +1193,22 @@ class OliverKellStrategy(StrategyBase):
             )
             self.positions[symbol] = position
 
+        rs_value_10d, rs_value_20d, rs_value_10w, vol_ratio = self._compute_signal_metrics(df)
+        metric_note = (
+                    self._format_rs_short_note(rs_value_10d)
+                    + self._format_rs_note(rs_value_20d)
+                    + self._format_rs_long_note(rs_value_10w)
+                    + self._format_vol_note(vol_ratio)
+                    + self._format_oneil_rs_note(*self._get_oneil_rs(symbol))
+                )
+
         reason = (
-            f"[{pattern_name}] Pattern breakout | "
+            f"[{pattern_name}] Pattern breakout{metric_note} | "
             f"[Base Low] ${base_low:.2f} | "
             f"[Variant]"
         )
 
-        return SignalEvent.create(
+        event = SignalEvent.create(
             symbol=symbol,
             timestamp=date,
             direction="buy",
@@ -1017,6 +1218,13 @@ class OliverKellStrategy(StrategyBase):
             cycle_stage=pattern_name.lower().replace(" ", "_"),
             current_price=close,
         )
+        event.data["rs_value_10d"] = rs_value_10d
+        event.data["rs_value"] = rs_value_20d
+        event.data["rs_value_10w"] = rs_value_10w
+        event.data["volume_ratio"] = vol_ratio
+        event.data["rs_rating"] = self._get_oneil_rs(symbol)[0]
+        event.data["rs_ratio"] = self._get_oneil_rs(symbol)[1]
+        return event
 
     def _slice_to_date(self, df: pd.DataFrame, date: datetime) -> pd.DataFrame:
         """切片到指定日期"""

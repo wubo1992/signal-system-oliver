@@ -74,3 +74,17 @@ com.sepa.signal.daily.plist
 # ============================
 *.log
 *.tmp
+
+# ============================
+# 一次性研究脚本 / 调试产物（本地保留，不进仓库）
+# 每个脚本都绑定某一天的信号快照，通用脚本在 scripts/ 下
+# ============================
+.bak.*/
+debug_*.py
+fix_*.sh
+data/expand_universe_failed.txt
+backtest_today_signals_*.py
+backtest_2026_today_buy_signals.py
+backtest_30d_buy_signals.py
+scripts/backtest_*.py
+scripts/inspect_wedge_pop.py

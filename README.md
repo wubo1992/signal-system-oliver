@@ -48,7 +48,7 @@ cp .env.example .env
 
 > 可选：Finnhub（EPS）、Alpha Vantage（2010-2016 历史）、Polygon、SEC EDGAR（完全免费但慢）
 
-### 第一次运行（下载 301 只美股约 10 年历史数据）
+### 第一次运行（下载 302 只美股约 10 年历史数据）
 
 ```bash
 uv run python main.py --mode live --strategy v_oliver_kell
@@ -86,11 +86,38 @@ uv run python main.py --mode backtest \
 
 ---
 
+## 相对强度指标
+
+所有信号都带四列相对强度数据，控制台 / CSV / 日报 / 雷达报告一致：
+
+| 列 | 含义 |
+|----|------|
+| `RS (10D)` | 过去 10 个交易日涨幅 ÷ SPY 同期涨幅（倍数，1.0 = 与大盘同步）|
+| `RS (20D)` | 过去 20 个交易日涨幅 ÷ SPY 同期涨幅（倍数）|
+| `RS (10W)` | 过去 50 个交易日涨幅 ÷ SPY 同期涨幅（倍数）|
+| `RS评级` | O'Neil RS Rating：1~99 横截面百分位（全市场排名）|
+| `RS倍数` | (1 + 个股 252 日涨幅) ÷ (1 + SPY 252 日涨幅)，财富指数之比，恒为正 |
+
+**O'Neil RS Rating** 公式（社区复刻口径，IBD 官方从未公布）：
+
+```
+RS Raw = 0.4 × ROC(63) + 0.2 × ROC(126) + 0.2 × ROC(189) + 0.2 × ROC(252)
+RS Rating = RS Raw 在横截面股票池内的百分位排名
+```
+
+ROC 用**绝对**涨幅、不除以大盘 —— RS Rating 是股票之间互比，跟标普比的是 RS Line。
+横截面股票池 = 全市场普通股（约 5,500 只），剔除权证 / 优先股 / 债券与僵尸票（数据停滞 30 天以上），
+保留 ETF 与 REIT。上市未满一年的新股按**可用窗口权重归一化**参与排名，不直接剔除。
+
+实现见 [`strategies/v_oliver_kell/oneil_rs.py`](strategies/v_oliver_kell/oneil_rs.py)。
+
+---
+
 ## 股票池
 
 合并三个来源（去重排序）：
 
-1. **手动池**：直接编辑 [`UNIVERSE.md`](UNIVERSE.md)（当前 301 只美股）
+1. **手动池**：直接编辑 [`UNIVERSE.md`](UNIVERSE.md)（当前 302 只美股）
 2. **指数成分股**：S&P 500 / Nasdaq 100 / Russell 2000（Wikipedia + 本地缓存）
 3. **Alpaca 新闻自动池**：每日增量更新，超 365 天未提及自动移出
 
@@ -140,7 +167,8 @@ signal-system-oliver/
 │       ├── wedge_finder.py            # 楔形检测
 │       ├── market_environment.py      # QQQ 四档状态
 │       ├── scale_in.py                # 分批建仓
-│       └── exit_manager.py            # 7 级出场
+│       ├── exit_manager.py            # 7 级出场
+│       └── oneil_rs.py                # O'Neil RS 评级（横截面百分位）
 │
 ├── signals/                           # 信号输出
 │   ├── generator.py                   # 控制台 + CSV

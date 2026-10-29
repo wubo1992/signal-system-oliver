@@ -34,13 +34,14 @@ import yaml
 from dotenv import load_dotenv
 
 from backtest.engine import BacktestEngine
-from data.fetcher import fetch
+from data.fetcher import fetch, CACHE_DIR
 from events import EventQueue
 from signals.generator import process_signals
 from signals.log_generator import update_signals_log
 from signals.positions import load_positions, save_positions
 from signals.report import generate_daily_report
 from signals.watchlist_scanner import scan_watchlist
+from strategies.v_oliver_kell.oneil_rs import compute_oneil_rs_map
 from signals.oliver_kell_radar_report import (
     generate_radar_report,
     print_radar_console,
@@ -129,8 +130,13 @@ def run_live(config: dict, strategy_arg: str | None) -> None:
     # Step 3: 运行策略
     t3 = time.time()
     print(f"\n[步骤 3/3] 运行 {strategy_name}...")
+
+    # O'Neil RS 横截面评级（1-99 百分位 + SPY 倍数），跨全本地缓存扩大股票池
+    oneil_rs_map = compute_oneil_rs_map(market_data, as_of=None, cache_dir=CACHE_DIR)
+    print(f"[RS评级] O'Neil RS 横截面：{len(oneil_rs_map)} 只有效样本")
+
     # v_trend_collection 分支在本精简版中不可用，直接初始化策略
-    strategy = strategy_cls(strategy_config, market_data, live_mode=True)
+    strategy = strategy_cls(strategy_config, market_data, live_mode=True, oneil_rs_map=oneil_rs_map)
 
     # 载入上次持仓（跨天追踪出场条件）
     saved_positions = load_positions(strategy_id)
@@ -161,9 +167,18 @@ def run_live(config: dict, strategy_arg: str | None) -> None:
     if strategy.positions:
         print(f"[持仓] 已保存 {len(strategy.positions)} 个持仓：{', '.join(strategy.positions.keys())}")
 
+    # ── Oliver Kell 雷达报告（仅 v_oliver_kell 策略）────────────────────
+    watchlist_records: list = []
+    if strategy_id == "v_oliver_kell":
+        # 扫描 watchlist 候选股（在 process_signals 之前，用于显示未来潜在买入信号）
+        watchlist_records = scan_watchlist(market_data, today, oneil_rs_map=oneil_rs_map)
+
     # 输出信号
-    records = process_signals(queue, config, strategy_id=strategy_id)
-    if not records:
+    records = process_signals(
+        queue, config, strategy_id=strategy_id,
+        watchlist_records=watchlist_records,
+    )
+    if not records and not watchlist_records:
         print("\n今日无有效信号。")
         print("（SEPA 条件严格，无信号是正常的。有信号时才需要关注。）")
 
@@ -177,9 +192,6 @@ def run_live(config: dict, strategy_arg: str | None) -> None:
 
     # ── Oliver Kell 雷达报告（仅 v_oliver_kell 策略）────────────────────
     if strategy_id == "v_oliver_kell":
-        # 扫描 watchlist 候选股
-        watchlist_records = scan_watchlist(market_data, today)
-
         # 打印雷达报告到控制台
         print_radar_console(records, watchlist_records)
 
@@ -466,6 +478,10 @@ def main() -> None:
         t_data = time.time()
         print(f"[耗时] 共享数据获取: {t_data - t0:.1f}秒\n")
 
+        # O'Neil RS 横截面评级（全部策略共用，避免重复计算）
+        oneil_rs_map = compute_oneil_rs_map(market_data, as_of=None, cache_dir=CACHE_DIR)
+        print(f"[RS评级] O'Neil RS 横截面：{len(oneil_rs_map)} 只有效样本\n")
+
         # ── 每个策略依次运行（复用已下载的数据）──────────────────
         for sk in strategy_keys:
             print(f"\n{'━'*60}")
@@ -488,7 +504,7 @@ def main() -> None:
                         all_strats.append(cls(strategy_config, market_data, live_mode=True))
                 strategy = strategy_cls(strategy_config, market_data, live_mode=True, all_strategies=all_strats)
             else:
-                strategy = strategy_cls(strategy_config, market_data, live_mode=True)
+                strategy = strategy_cls(strategy_config, market_data, live_mode=True, oneil_rs_map=oneil_rs_map)
 
             saved_positions = load_positions(strategy_id)
             if saved_positions:
@@ -523,7 +539,7 @@ def main() -> None:
 
             # ── Oliver Kell 雷达报告（仅 v_oliver_kell 策略）────────────
             if strategy_id == "v_oliver_kell":
-                watchlist_records = scan_watchlist(market_data, today)
+                watchlist_records = scan_watchlist(market_data, today, oneil_rs_map=oneil_rs_map)
                 print_radar_console(records, watchlist_records)
                 radar_path = generate_radar_report(
                     today_records=records,

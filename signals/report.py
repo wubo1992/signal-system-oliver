@@ -79,9 +79,10 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
     ]
 
     # ── 今日新增信号 ───────────────────────────────────────
-    today_buys   = [r for r in today_records if r.get("信号") == "买入"]
-    today_sells  = [r for r in today_records if r.get("信号") == "卖出"]
-    today_shorts = [r for r in today_records if r.get("信号") == "做空"]
+    today_buys    = [r for r in today_records if r.get("信号") == "买入"]
+    today_sells   = [r for r in today_records if r.get("信号") == "卖出"]
+    today_shorts  = [r for r in today_records if r.get("信号") == "做空"]
+    today_watches = [r for r in today_records if r.get("信号") == "观望"]
 
     if not today_records:
         lines += [
@@ -93,13 +94,8 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
         ]
     else:
         if today_buys:
-            lines += [
-                "## 今日新增买入信号",
-                "",
-            ]
-            for r in sorted(today_buys, key=lambda x: -int(x.get("强度(1-5)", 0))):
-                lines += _format_signal_detail(r, is_today=True)
-                lines.append("")
+            lines += _format_today_buys_table(today_buys)
+            lines.append("")
 
         if today_sells:
             lines += [
@@ -111,13 +107,12 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                 lines.append("")
 
         if today_shorts:
-            lines += [
-                "## 今日做空信号",
-                "",
-            ]
-            for r in sorted(today_shorts, key=lambda x: -int(x.get("强度(1-5)", 0))):
-                lines += _format_short_signal(r, is_today=True)
-                lines.append("")
+            lines += _format_today_shorts_table(today_shorts)
+            lines.append("")
+
+        if today_watches:
+            lines += _format_today_watches_table(today_watches)
+            lines.append("")
 
     lines += ["---", ""]
 
@@ -128,9 +123,10 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
     ]
 
     all_recent = history  # 已经包含今天
-    buys_7d   = [r for r in all_recent if r.get("信号") == "买入"]
-    sells_7d  = [r for r in all_recent if r.get("信号") == "卖出"]
-    shorts_7d = [r for r in all_recent if r.get("信号") == "做空"]
+    buys_7d    = [r for r in all_recent if r.get("信号") == "买入"]
+    sells_7d   = [r for r in all_recent if r.get("信号") == "卖出"]
+    shorts_7d  = [r for r in all_recent if r.get("信号") == "做空"]
+    watches_7d = [r for r in all_recent if r.get("信号") == "观望"]
 
     if not all_recent:
         lines.append("> 过去 7 天内无任何信号记录。\n")
@@ -139,15 +135,18 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             lines += [
                 "### 买入信号",
                 "",
-                "| 日期 | 股票 | 强度 | 参考止损 | 触发摘要 |",
-                "|------|------|------|----------|----------|",
+                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发摘要 |",
+                "|------|------|------|----------|----------|----------|----------|------|--------|--------|----------|",
             ]
             for r in sorted(buys_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
                 summary = _short_summary(r.get("触发原因", ""))
                 lines.append(
                     f"| {r['日期']} | **{r['股票']}** | {stars} "
-                    f"| {r.get('参考止损', '—')} | {summary} |"
+                    f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
+                    f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
+                    f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
+                    f"| {_format_rs(r.get('RS倍数'))} | {summary} |"
                 )
             lines.append("")
 
@@ -168,15 +167,43 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             lines += [
                 "### 做空信号",
                 "",
-                "| 日期 | 股票 | 强度 | 参考止损 | 触发摘要 |",
-                "|------|------|------|----------|----------|",
+                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发摘要 |",
+                "|------|------|------|----------|----------|----------|----------|------|--------|--------|----------|",
             ]
             for r in sorted(shorts_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
                 summary = _short_summary(r.get("触发原因", ""))
                 lines.append(
                     f"| {r['日期']} | **{r['股票']}** | {stars} "
-                    f"| {r.get('参考止损', '—')} | {summary} |"
+                    f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
+                    f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
+                    f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
+                    f"| {_format_rs(r.get('RS倍数'))} | {summary} |"
+                )
+            lines.append("")
+
+        if watches_7d:
+            lines += [
+                "### 🐂 未来潜在买入（底部反弹 / 形态收紧）",
+                "",
+                "| 日期 | 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 参考止损 |",
+                "|------|------|------|------|----------------|----------|----------|----------|----------|------|--------|--------|----------|",
+            ]
+            for r in sorted(watches_7d, key=lambda x: x.get("日期", ""), reverse=True):
+                stars = "★" * int(r.get("强度(1-5)", 0))
+                import re as _re
+                reason = r.get("触发原因", "")
+                dist_m = _re.search(r'Current EMA20 distance:\s*([+\-]?[\d.]+)%', reason)
+                rebound_m = _re.search(r'Cum rebound \(since bottom (\d+)d ago\):\s+\+?([\d.]+)%', reason)
+                range_m = _re.search(r'Range contraction ([\d.]+)%', reason)
+                stage = "底部反弹" if "Reversal Extension" in reason else "形态收紧"
+                dist = f"{dist_m.group(1)}%" if dist_m else (f"{range_m.group(1)}%" if range_m else "—")
+                rebound = f"+{rebound_m.group(2)}%" if rebound_m else "—"
+                lines.append(
+                    f"| {r['日期']} | **{r['股票']}** | {stars} | {stage} | {dist} | {rebound} "
+                    f"| {_format_rs(r.get('RS (10D)'))} | {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
+                    f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
+                    f"| {_format_rs(r.get('RS倍数'))} | {r.get('参考止损', '—')} |"
                 )
             lines.append("")
 
@@ -231,6 +258,70 @@ def _format_signal_detail(r: dict, is_today: bool) -> list[str]:
     tag = "🆕 **今日新增**" if is_today else f"📅 {date_str}"
     sections = _parse_reason(reason)
 
+    # RS / 量比显示（优先从 record 字段读取，缺失则尝试 reason 解析）
+    rs_10d_val = r.get("RS (10D)", r.get("rs_value_10d"))
+    rs_val = r.get("RS (20D)", r.get("RS"))
+    rs_10w_val = r.get("RS (10W)", r.get("rs_value_10w"))
+    vol_val = r.get("量比")
+    if rs_10d_val is None:
+        rs_10d_section = sections.get("[RS-10D]", "")
+        if rs_10d_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_10d_section)
+            if m:
+                rs_10d_val = float(m.group(1))
+    if rs_val is None:
+        rs_str_section = sections.get("[RS]", "")
+        if rs_str_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_str_section)
+            if m:
+                rs_val = float(m.group(1))
+    if rs_10w_val is None:
+        rs_10w_section = sections.get("[RS-10W]", "")
+        if rs_10w_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_10w_section)
+            if m:
+                rs_10w_val = float(m.group(1))
+    if vol_val is None:
+        vol_str_section = sections.get("[Vol]", "")
+        if vol_str_section:
+            m = re.search(r"([+-]?[\d.]+)", vol_str_section)
+            if m:
+                vol_val = float(m.group(1))
+    # O'Neil RS 评级：优先读 record，缺失则从 [RS-Rating] / [RS-Mult] token 解析
+    rating_val = r.get("RS评级")
+    mult_val = r.get("RS倍数")
+    if rating_val is None:
+        sec = sections.get("[RS-Rating]", "")
+        m = re.search(r"(\d+)", sec)
+        if m:
+            rating_val = int(m.group(1))
+    if mult_val is None:
+        sec = sections.get("[RS-Mult]", "")
+        m = re.search(r"([+-]?[\d.]+)", sec)
+        if m:
+            mult_val = float(m.group(1))
+
+    rs_10d_display = (
+        f"{float(rs_10d_val):.4f}"
+        if isinstance(rs_10d_val, (int, float)) else
+        (rs_10d_val if rs_10d_val else "—")
+    )
+    rs_display = (
+        f"{float(rs_val):.4f}"
+        if isinstance(rs_val, (int, float)) else
+        (rs_val if rs_val else "—")
+    )
+    rs_10w_display = (
+        f"{float(rs_10w_val):.4f}"
+        if isinstance(rs_10w_val, (int, float)) else
+        (rs_10w_val if rs_10w_val else "—")
+    )
+    vol_display = (
+        f"{float(vol_val):.1f}x"
+        if isinstance(vol_val, (int, float)) else
+        (vol_val if vol_val else "—")
+    )
+
     lines = [
         f"### {tag} — 买入 {symbol}　{stars}",
         "",
@@ -242,6 +333,12 @@ def _format_signal_detail(r: dict, is_today: bool) -> list[str]:
         f"| 信号方向 | 买入 |",
         f"| 信号强度 | {stars}（{strength}/5） |",
         f"| 参考止损 | {stop} |",
+        f"| RS (10D) | {rs_10d_display} |",
+        f"| RS (20D) | {rs_display} |",
+        f"| RS (10W) | {rs_10w_display} |",
+        f"| 量比 | {vol_display} |",
+        f"| RS评级 (O'Neil 1-99) | {_format_rating(rating_val)} |",
+        f"| RS倍数 (vs SPY 252日) | {_format_rs(mult_val)} |",
         f"| 建议操作 | {'明日开盘买入' if is_today else date_str + ' 次日已可执行'} |",
         "",
     ]
@@ -347,6 +444,72 @@ def _format_short_signal(r: dict, is_today: bool) -> list[str]:
     reason    = r.get("触发原因", "")
 
     tag = "🆕 **今日新增**" if is_today else f"📅 {date_str}"
+    sections = _parse_reason(reason)
+
+    # RS / 量比显示（短信号也支持）
+    rs_10d_val = r.get("RS (10D)", r.get("rs_value_10d"))
+    rs_val = r.get("RS (20D)", r.get("RS"))
+    rs_10w_val = r.get("RS (10W)", r.get("rs_value_10w"))
+    vol_val = r.get("量比")
+    if rs_10d_val is None:
+        rs_10d_section = sections.get("[RS-10D]", "")
+        if rs_10d_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_10d_section)
+            if m:
+                rs_10d_val = float(m.group(1))
+    if rs_val is None:
+        rs_str_section = sections.get("[RS]", "")
+        if rs_str_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_str_section)
+            if m:
+                rs_val = float(m.group(1))
+    if rs_10w_val is None:
+        rs_10w_section = sections.get("[RS-10W]", "")
+        if rs_10w_section:
+            m = re.search(r"([+-]?[\d.]+)", rs_10w_section)
+            if m:
+                rs_10w_val = float(m.group(1))
+    if vol_val is None:
+        vol_str_section = sections.get("[Vol]", "")
+        if vol_str_section:
+            m = re.search(r"([+-]?[\d.]+)", vol_str_section)
+            if m:
+                vol_val = float(m.group(1))
+    # O'Neil RS 评级：优先读 record，缺失则从 [RS-Rating] / [RS-Mult] token 解析
+    rating_val = r.get("RS评级")
+    mult_val = r.get("RS倍数")
+    if rating_val is None:
+        sec = sections.get("[RS-Rating]", "")
+        m = re.search(r"(\d+)", sec)
+        if m:
+            rating_val = int(m.group(1))
+    if mult_val is None:
+        sec = sections.get("[RS-Mult]", "")
+        m = re.search(r"([+-]?[\d.]+)", sec)
+        if m:
+            mult_val = float(m.group(1))
+
+    rs_10d_display = (
+        f"{float(rs_10d_val):.4f}"
+        if isinstance(rs_10d_val, (int, float)) else
+        (rs_10d_val if rs_10d_val else "—")
+    )
+    rs_display = (
+        f"{float(rs_val):.4f}"
+        if isinstance(rs_val, (int, float)) else
+        (rs_val if rs_val else "—")
+    )
+    rs_10w_display = (
+        f"{float(rs_10w_val):.4f}"
+        if isinstance(rs_10w_val, (int, float)) else
+        (rs_10w_val if rs_10w_val else "—")
+    )
+    vol_display = (
+        f"{float(vol_val):.1f}x"
+        if isinstance(vol_val, (int, float)) else
+        (vol_val if vol_val else "—")
+    )
+
     lines = [
         f"### {tag} — 做空 {symbol}　{stars}",
         "",
@@ -358,6 +521,12 @@ def _format_short_signal(r: dict, is_today: bool) -> list[str]:
         f"| 信号方向 | 做空 |",
         f"| 信号强度 | {stars}（{strength}/5） |",
         f"| 止损价格 | {stop_loss}（buy-to-cover） |",
+        f"| RS (10D) | {rs_10d_display} |",
+        f"| RS (20D) | {rs_display} |",
+        f"| RS (10W) | {rs_10w_display} |",
+        f"| 量比 | {vol_display} |",
+        f"| RS评级 (O'Neil 1-99) | {_format_rating(rating_val)} |",
+        f"| RS倍数 (vs SPY 252日) | {_format_rs(mult_val)} |",
         f"| 建议操作 | {'明日开盘做空' if is_today else date_str + ' 次日已可执行'} |",
         "",
     ]
@@ -393,7 +562,7 @@ def _parse_reason(reason: str) -> dict:
     parts = reason.split(" | ")
     for part in parts:
         part = part.strip()
-        for key in ["[趋势]", "[RS]", "[VCP]", "[突破]", "[量能]"]:
+        for key in ["[趋势]", "[RS-10D]", "[RS-10W]", "[RS]", "[VCP]", "[突破]", "[量能]", "[Vol]", "[Stage]"]:
             if part.startswith(key):
                 sections[key] = part[len(key):].strip()
                 break
@@ -479,8 +648,170 @@ def _interpret_breakout(breakout: str) -> list[str]:
 
 
 # ══════════════════════════════════════════════════════════
+# 今日信号大表格
+# ══════════════════════════════════════════════════════════
+
+def _format_today_buys_table(records: list[dict]) -> list[str]:
+    """今日买入信号统一大表格：股票 / 强度 / 止损 / RS 三联 / 量比 / 触发条件。"""
+    lines = [
+        f"## 🟢 今日新增买入信号（{len(records)} 条）",
+        "",
+        "| 股票 | 强度 | 止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发条件 |",
+        "|------|------|------|----------|----------|----------|------|--------|--------|----------|",
+    ]
+    for r in sorted(records, key=lambda x: (-int(x.get("强度(1-5)", 0)), x.get("RS (10D)", 0))):
+        symbol   = r.get("股票", "?")
+        strength = int(r.get("强度(1-5)", 0))
+        stars    = "★" * strength + "☆" * (5 - strength)
+        stop     = r.get("参考止损", "—")
+        rs_10d   = _format_rs(r.get("RS (10D)"))
+        rs_20d   = _format_rs(r.get("RS (20D)"))
+        rs_10w   = _format_rs(r.get("RS (10W)"))
+        vol      = _format_vol(r.get("量比"))
+        rating   = _format_rating(r.get("RS评级"))
+        mult     = _format_rs(r.get("RS倍数"))
+        trigger  = _extract_trigger_short(r.get("触发原因", ""))
+        lines.append(
+            f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
+            f"| {rating} | {mult} | {trigger} |"
+        )
+    lines.append("")
+    lines += [
+        "> **风险提示**：以上均为系统自动识别的技术信号，不构成投资建议。",
+        "> 止损对应从买入价亏损约 10%，务必在买入后立即挂止损单。",
+    ]
+    return lines
+
+
+def _format_today_watches_table(records: list[dict]) -> list[str]:
+    """今日潜在买入（底部反弹 / 形态收紧）统一大表格。"""
+    import re as _re
+    lines = [
+        f"## 🐂 今日潜在买入（{len(records)} 条 — 底部反弹 / 形态收紧）",
+        "",
+        "> 等待 Wedge Pop 或 Base n' Break 确认后转正为【买入信号】。",
+        "",
+        "| 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | 量比 | RS (10D) | RS (20D) | RS (10W) | RS评级 | RS倍数 | 参考止损 |",
+        "|------|------|------|----------------|----------|------|----------|----------|----------|--------|--------|----------|",
+    ]
+    for r in sorted(records, key=lambda x: -int(x.get("强度(1-5)", 0))):
+        symbol   = r.get("股票", "?")
+        strength = int(r.get("强度(1-5)", 0))
+        stars    = "★" * strength + "☆" * (5 - strength)
+        reason   = r.get("触发原因", "")
+        dist_m = _re.search(r'Current EMA20 distance:\s*([+\-]?[\d.]+)%', reason)
+        rebound_m = _re.search(r'Cum rebound \(since bottom (\d+)d ago\):\s+\+?([\d.]+)%', reason)
+        range_m = _re.search(r'Range contraction ([\d.]+)%', reason)
+        stage = "底部反弹" if "Reversal Extension" in reason else "形态收紧"
+        dist = f"{dist_m.group(1)}%" if dist_m else (f"{range_m.group(1)}%" if range_m else "—")
+        rebound = f"+{rebound_m.group(2)}%" if rebound_m else "—"
+        lines.append(
+            f"| **{symbol}** | {stars} | {stage} | {dist} | {rebound} | "
+            f"{_format_vol(r.get('量比'))} | {_format_rs(r.get('RS (10D)'))} "
+            f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
+            f"| {_format_rating(r.get('RS评级'))} | {_format_rs(r.get('RS倍数'))} "
+            f"| {r.get('参考止损', '—')} |"
+        )
+    lines.append("")
+    lines += [
+        "> **风险提示**：底部反弹 / 形态收紧是观察池信号，不是立即买入信号。",
+        "> 等待对应确认形态出现后再考虑入场。",
+    ]
+    return lines
+
+
+def _format_today_shorts_table(records: list[dict]) -> list[str]:
+    """今日做空信号统一大表格。"""
+    lines = [
+        f"## 🔴 今日做空信号（{len(records)} 条）",
+        "",
+        "| 股票 | 强度 | 止损（buy-to-cover） | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发条件 |",
+        "|------|------|---------------------|----------|----------|----------|------|--------|--------|----------|",
+    ]
+    for r in sorted(records, key=lambda x: (-int(x.get("强度(1-5)", 0)), x.get("RS (10D)", 1))):
+        symbol   = r.get("股票", "?")
+        strength = int(r.get("强度(1-5)", 0))
+        stars    = "★" * strength + "☆" * (5 - strength)
+        stop     = r.get("参考止损", "—")
+        rs_10d   = _format_rs(r.get("RS (10D)"))
+        rs_20d   = _format_rs(r.get("RS (20D)"))
+        rs_10w   = _format_rs(r.get("RS (10W)"))
+        vol      = _format_vol(r.get("量比"))
+        rating   = _format_rating(r.get("RS评级"))
+        mult     = _format_rs(r.get("RS倍数"))
+        trigger  = _extract_trigger_short(r.get("触发原因", ""))
+        lines.append(
+            f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
+            f"| {rating} | {mult} | {trigger} |"
+        )
+    lines.append("")
+    lines += [
+        "> **风险提示**：以上均为系统自动识别的技术信号，不构成投资建议。",
+        "> 做空止损对应从做空价亏损约 2%，务必在做空后立即挂 buy-to-cover 止损单。",
+    ]
+    return lines
+
+
+# ══════════════════════════════════════════════════════════
 # 工具函数
 # ══════════════════════════════════════════════════════════
+
+
+def _format_rs(val) -> str:
+    """格式化 RS 数值：float→4位小数；None/空/破折号→'—'。"""
+    if val is None or val == "" or val == "—":
+        return "—"
+    try:
+        return f"{float(val):.4f}"
+    except (TypeError, ValueError):
+        return str(val)
+
+
+def _format_rating(val) -> str:
+    """格式化 O'Neil RS 评级：float→整数；None/空/破折号→'—'。"""
+    if val is None or val == "" or val == "—":
+        return "—"
+    try:
+        return f"{int(float(val))}"
+    except (TypeError, ValueError):
+        return str(val)
+
+
+def _format_vol(val) -> str:
+    """格式化量比：float→'X.Xx'；None/空/破折号→'—'。"""
+    if val is None or val == "" or val == "—":
+        return "—"
+    try:
+        return f"{float(val):.1f}x"
+    except (TypeError, ValueError):
+        return str(val)
+
+
+def _extract_trigger_short(reason: str) -> str:
+    """从触发原因里提取最关键的策略标签（如 'EMA Crossback' / 'Wedge Drop' / 'Base n' Break'）。"""
+    if not reason:
+        return "—"
+    # 优先匹配 Oliver Kell 的策略标签
+    priority_tags = [
+        ("Wedge Pop", "Wedge Pop"),
+        ("Wedge Drop", "Wedge Drop"),
+        ("EMA Crossback", "EMA Crossback"),
+        ("Base n' Break", "Base n' Break"),
+        ("Exhaustion Extension", "Exhaustion Ext"),
+        ("Exhaustion Short", "Exhaustion Ext"),
+        ("Reversal Extension", "Reversal Ext"),
+        ("Base Tightening", "Base Tightening"),
+        ("VCP", "VCP"),
+        ("突破", "突破"),
+        ("EMA20 Break", "EMA20 Break"),
+        ("Failed Breakout", "Failed Breakout"),
+        ("Time Stop", "Time Stop"),
+    ]
+    for needle, label in priority_tags:
+        if needle in reason:
+            return label
+    # 兜底：用 reason 前 20 字符
+    return reason[:20].strip() or "—"
 
 def _read_recent_signals(strategy_id: str = "v1_wizard", days: int = 7) -> list[dict]:
     """从策略专属 signals.csv 读取最近 N 天的信号记录。days=0 表示仅用于计数。"""

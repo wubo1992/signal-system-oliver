@@ -8,7 +8,7 @@ from strategies.v_oliver_kell.scale_in import ScaleInManager, BatchState, Positi
 
 
 def test_batch1_initial_entry():
-    """Batch 1: 初始 15% 仓位"""
+    """Batch 1: 初始 20% 仓位（PDF 15-20% 区间上限，见 BATCH1_PCT 注释）"""
     manager = ScaleInManager()
     # 假设没有持仓
     assert manager.get_batch_state("AAPL") == BatchState.NONE
@@ -17,7 +17,7 @@ def test_batch1_initial_entry():
     manager.on_wedge_pop("AAPL", entry_price=100.0, stop_loss=98.0)
     state = manager.get_batch_state("AAPL")
     assert state == BatchState.BATCH1_OPEN
-    assert manager.get_position_pct("AAPL") == 15.0
+    assert manager.get_position_pct("AAPL") == pytest.approx(20.0)
 
 
 def test_batch2_add_on():
@@ -30,7 +30,8 @@ def test_batch2_add_on():
     manager.on_follow_through("AAPL", follow_through_low=103.0)
     state = manager.get_batch_state("AAPL")
     assert state == BatchState.BATCH2_OPEN
-    assert manager.get_position_pct("AAPL") == 30.0
+    # 0.20 + 0.10 在二进制浮点下是 30.000000000000004，用 approx 比较
+    assert manager.get_position_pct("AAPL") == pytest.approx(30.0)
 
 
 def test_stop_raised_after_batch2():

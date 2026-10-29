@@ -5,7 +5,7 @@ import numpy as np
 
 import sys
 sys.path.insert(0, "/Users/wubo/Desktop/codes/signal_system_Oliver")
-from strategies.v_oliver_kell.wedge_finder import WedgeFinder, WedgeType
+from strategies.v_oliver_kell.wedge_finder import WedgeFinder, WedgeType, WedgeResult
 
 
 def make_wedge_df(wedge_type: str):
