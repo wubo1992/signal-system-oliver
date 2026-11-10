@@ -16,6 +16,7 @@ from typing import Any
 import pandas as pd
 
 from events import SignalEvent
+from strategies.v_oliver_kell.weinstein_stage import compute_weinstein_stage
 
 
 def scan_watchlist(
@@ -102,6 +103,7 @@ def scan_watchlist(
             rs_value_10d = _compute_rs_value_short(df_to_date, benchmark_df, lookback=10)
             rs_value_10w = _compute_rs_value_long(df_to_date, benchmark_df, lookback=50)
             rs_rating, rs_ratio = oneil_rs_map.get(symbol, (None, None))
+            stage, stage_label = compute_weinstein_stage(df_to_date)
 
             sig = SignalEvent.create(
                 symbol=symbol,
@@ -113,7 +115,8 @@ def scan_watchlist(
                        f"Cum rebound (since bottom {days_since_bottom}d ago): +{cumulative_rebound:.1f}% | "
                        f"Today: +{price_change:.1f}%, vol {vol_ratio:.1f}x avg"
                        f"{_rs_short_token(rs_value_10d)}{_rs_token(rs_value)}{_rs_long_token(rs_value_10w)}"
-                       f"{_oneil_rs_token(rs_rating, rs_ratio)}",
+                       f"{_oneil_rs_token(rs_rating, rs_ratio)}"
+                       f"{_stage_token(stage, stage_label)}",
                 stop_loss=round(ema20 * 0.95, 2),
                 cycle_stage="reversal_extension",
                 current_price=close,
@@ -124,6 +127,8 @@ def scan_watchlist(
             sig.data["volume_ratio"] = vol_ratio if vol_avg > 0 else None
             sig.data["rs_rating"] = rs_rating
             sig.data["rs_ratio"] = rs_ratio
+            sig.data["weinstein_stage"] = stage_label
+            sig.data["weinstein_stage_num"] = stage
             signals.append(sig)
             continue
 
@@ -154,6 +159,7 @@ def scan_watchlist(
                 rs_value_10d = _compute_rs_value_short(df_to_date, benchmark_df, lookback=10)
                 rs_value_10w = _compute_rs_value_long(df_to_date, benchmark_df, lookback=50)
                 rs_rating, rs_ratio = oneil_rs_map.get(symbol, (None, None))
+                stage, stage_label = compute_weinstein_stage(df_to_date)
 
                 sig = SignalEvent.create(
                     symbol=symbol,
@@ -164,7 +170,8 @@ def scan_watchlist(
                            f"Range contraction {price_range:.1f}% in 10 days | "
                            f"High 20d: ${high_20:.2f}"
                            f"{_rs_short_token(rs_value_10d)}{_rs_token(rs_value)}{_rs_long_token(rs_value_10w)}{_vol_token(vol_ratio if vol_avg_20 > 0 else None)}"
-                           f"{_oneil_rs_token(rs_rating, rs_ratio)}",
+                           f"{_oneil_rs_token(rs_rating, rs_ratio)}"
+                           f"{_stage_token(stage, stage_label)}",
                     stop_loss=round(ema20 * 0.98, 2),
                     cycle_stage="base_tightening",
                     current_price=close,
@@ -175,6 +182,8 @@ def scan_watchlist(
                 sig.data["volume_ratio"] = vol_ratio if vol_avg_20 > 0 else None
                 sig.data["rs_rating"] = rs_rating
                 sig.data["rs_ratio"] = rs_ratio
+                sig.data["weinstein_stage"] = stage_label
+                sig.data["weinstein_stage_num"] = stage
                 signals.append(sig)
 
     return signals
@@ -261,8 +270,16 @@ def _rs_long_token(rs_value: float | None) -> str:
         return ""
 
 
+def _stage_token(stage: int | None, label: str) -> str:
+    """Weinstein 阶段 token（[Stage] Stage 2 上升）。数据不足时返回空串。"""
+    if stage is None:
+        return ""
+    return f" | [Stage] {label}"
+
+
 def _oneil_rs_token(rs_rating: int | None, rs_ratio: float | None) -> str:
     """O'Neil RS 评级 token（[RS-Rating] 1-99 百分位 + [RS-Mult] SPY 倍数）。"""
+
     if rs_rating is None and rs_ratio is None:
         return ""
     parts = []

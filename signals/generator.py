@@ -37,9 +37,10 @@ _DIRECTION_CN = {
 # 量比 = 今日成交量 / 20 日均量（不含今日）
 # RS评级 = O'Neil RS Rating，横截面 1-99 百分位（CAN SLIM 门槛 80）
 # RS倍数 = (1+个股252日涨幅)/(1+SPY同期涨幅)，财富指数之比（1.0 = 与大盘同步）
+# Weinstein阶段 = Weinstein 四阶段分析（1 筑底 / 2 上升 / 3 做顶 / 4 下跌）
 _CSV_HEADERS = [
     "日期", "股票", "信号", "强度(1-5)", "触发原因", "参考止损", "持仓股数",
-    "RS (10D)", "RS (20D)", "RS (10W)", "量比", "RS评级", "RS倍数",
+    "RS (10D)", "RS (20D)", "RS (10W)", "量比", "RS评级", "RS倍数", "Weinstein阶段",
 ]
 
 
@@ -111,6 +112,7 @@ def _event_to_record(event: SignalEvent) -> dict:
     vol_ratio = event.data.get("volume_ratio")
     rs_rating = event.data.get("rs_rating")      # O'Neil 1-99 百分位
     rs_ratio = event.data.get("rs_ratio")        # 财富指数之比 vs SPY
+    stage = event.data.get("weinstein_stage")    # Weinstein 四阶段标签
 
     stop_str = f"${stop_loss:.2f}" if stop_loss is not None else "—"
     stars = "★" * strength + "☆" * (5 - strength)
@@ -143,6 +145,7 @@ def _event_to_record(event: SignalEvent) -> dict:
     mult_str = (
         f"{float(rs_ratio):.4f}" if isinstance(rs_ratio, (int, float)) else "—"
     )
+    stage_str = str(stage) if stage else "—"
 
     return {
         "日期": date_str,
@@ -159,6 +162,7 @@ def _event_to_record(event: SignalEvent) -> dict:
         "量比": vol_str,
         "RS评级": rating_str,
         "RS倍数": mult_str,
+        "Weinstein阶段": stage_str,
     }
 
 
@@ -205,6 +209,7 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
                     "量比": f"{float(vol_ratio):.1f}x" if isinstance(vol_ratio, (int, float)) else "—",
                     "RS评级": f"{int(rs_rating)}" if isinstance(rs_rating, (int, float)) else "—",
                     "RS倍数": f"{float(rs_ratio):.4f}" if isinstance(rs_ratio, (int, float)) else "—",
+                    "Weinstein阶段": str(r.data.get("weinstein_stage")) if r.data.get("weinstein_stage") else "—",
                 }
             else:
                 # dict 格式
@@ -223,6 +228,7 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
                 rs_10w_m = _re.search(r'\[RS-10W\]\s*([+-]?[\d.]+)', reason)
                 rating_m = _re.search(r'\[RS-Rating\]\s*(\d+)', reason)
                 mult_m = _re.search(r'\[RS-Mult\]\s*([+-]?[\d.]+)', reason)
+                stage_m = _re.search(r'\[Stage\]\s*([^|]+)$', reason.strip())
                 reversal_extension_records.append({
                     "日期": rec_dict.get("日期", ""),
                     "股票": rec_dict["股票"],
@@ -237,6 +243,7 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
                     "RS (10W)": f"{rs_10w_m.group(1)}" if rs_10w_m else rec_dict.get("RS (10W)", "—"),
                     "RS评级": f"{rating_m.group(1)}" if rating_m else rec_dict.get("RS评级", "—"),
                     "RS倍数": f"{mult_m.group(1)}" if mult_m else rec_dict.get("RS倍数", "—"),
+                    "Weinstein阶段": stage_m.group(1).strip() if stage_m else rec_dict.get("Weinstein阶段", "—"),
                     "参考止损": rec_dict.get("参考止损", "—"),
                     "触发原因": reason,
                 })
@@ -253,6 +260,7 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
                     "量比": rec_dict.get("量比", "—"),
                     "RS评级": rec_dict.get("RS评级", "—"),
                     "RS倍数": rec_dict.get("RS倍数", "—"),
+                    "Weinstein阶段": rec_dict.get("Weinstein阶段", "—"),
                     "参考止损": rec_dict.get("参考止损", "—"),
                     "触发原因": reason,
                 })
@@ -266,13 +274,13 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
 
     if buy_records:
         print(f"\n【买入信号】共 {len(buy_records)} 个")
-        print(f"{'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'参考止损':<10} 触发原因")
-        print("-" * 125)
+        print(f"{'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'WStage':<12} {'参考止损':<10} 触发原因")
+        print("-" * 137)
         for r in sorted(buy_records, key=lambda x: -x["强度(1-5)"]):
             print(
                 f"{r['日期']:<12} {r['股票']:<8} {r['强度星级']:<8} "
                 f"{r.get('RS (10D)', '—'):<8} {r.get('RS (20D)', '—'):<8} {r.get('RS (10W)', '—'):<8} {r.get('量比', '—'):<8} "
-                f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} "
+                f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} {r.get('Weinstein阶段', '—'):<12} "
                 f"{r['参考止损']:<10} {r['触发原因']}"
             )
 
@@ -288,14 +296,14 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
             print("    等待确认：出现 Wedge Pop 形态 → 转正为【买入信号】")
             print("    风控要点：若再次跌破 EMA20 × 0.95，形态失效")
             print()
-            print(f"    {'日期':<12} {'股票':<8} {'强度':<8} {'距EMA20':<10} {'累计反弹':<10} {'底部距今':<10} {'量比':<7} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'RS评级':<7} {'RS倍数':<8} {'参考止损':<10}")
-            print("    " + "-" * 135)
+            print(f"    {'日期':<12} {'股票':<8} {'强度':<8} {'距EMA20':<10} {'累计反弹':<10} {'底部距今':<10} {'量比':<7} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'RS评级':<7} {'RS倍数':<8} {'WStage':<12} {'参考止损':<10}")
+            print("    " + "-" * 147)
             for r in sorted(reversal_extension_records, key=lambda x: float(x["距EMA20"].rstrip("%"))):
                 print(
                     f"    {r['日期']:<12} {r['股票']:<8} {r['强度星级']:<8} "
                     f"{r['距EMA20']:<10} {r['反弹']:<10} {r['底部距今']:<10} {r['量比']:<7} "
                     f"{r.get('RS (10D)', '—'):<8} {r.get('RS (20D)', '—'):<8} {r.get('RS (10W)', '—'):<8} "
-                    f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} {r['参考止损']:<10}"
+                    f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} {r.get('Weinstein阶段', '—'):<12} {r['参考止损']:<10}"
                 )
             print()
 
@@ -305,13 +313,13 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
             print("    等待确认：放量突破 20日高点 → 转正为【买入信号】(Base n' Break)")
             print("    风控要点：跌破 EMA20 视为形态失败")
             print()
-            print(f"    {'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'参考止损':<10} 触发原因")
-            print("    " + "-" * 125)
+            print(f"    {'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'WStage':<12} {'参考止损':<10} 触发原因")
+            print("    " + "-" * 137)
             for r in base_tightening_records:
                 print(
                     f"    {r['日期']:<12} {r['股票']:<8} {r['强度星级']:<8} "
                     f"{r.get('RS (10D)', '—'):<8} {r.get('RS (20D)', '—'):<8} {r.get('RS (10W)', '—'):<8} {r.get('量比', '—'):<8} "
-                    f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} "
+                    f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} {r.get('Weinstein阶段', '—'):<12} "
                     f"{r['参考止损']:<10} {r['触发原因']}"
                 )
             print()
@@ -325,13 +333,13 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
 
     if short_records:
         print(f"\n【做空信号】共 {len(short_records)} 个")
-        print(f"{'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'参考止损':<10} 触发原因")
-        print("-" * 125)
+        print(f"{'日期':<12} {'股票':<8} {'强度':<8} {'RS10D':<8} {'RS20D':<8} {'RS10W':<8} {'量比':<8} {'RS评级':<7} {'RS倍数':<8} {'WStage':<12} {'参考止损':<10} 触发原因")
+        print("-" * 137)
         for r in sorted(short_records, key=lambda x: -x["强度(1-5)"]):
             print(
                 f"{r['日期']:<12} {r['股票']:<8} {r['强度星级']:<8} "
                 f"{r.get('RS (10D)', '—'):<8} {r.get('RS (20D)', '—'):<8} {r.get('RS (10W)', '—'):<8} {r.get('量比', '—'):<8} "
-                f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} "
+                f"{r.get('RS评级', '—'):<7} {r.get('RS倍数', '—'):<8} {r.get('Weinstein阶段', '—'):<12} "
                 f"{r['参考止损']:<10} {r['触发原因']}"
             )
 
@@ -345,13 +353,13 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
 def _append_to_csv(records: list[dict], strategy_id: str = "v1_wizard") -> None:
     """把信号追加写入 CSV 文件（去重后写入，同一日同一股票同一方向只保留一条）。
 
-    Schema 迁移：旧 7/9/10/11 列 schema 升级到 13 列（新增 RS评级、RS倍数），旧文件先备份再重写。
+    Schema 迁移：旧 7/9/10/11/13 列 schema 升级到 14 列（新增 RS评级、RS倍数、Weinstein阶段），旧文件先备份再重写。
     """
     strategy_dir = OUTPUT_DIR / strategy_id
     strategy_dir.mkdir(parents=True, exist_ok=True)
     signals_csv = strategy_dir / "signals.csv"
 
-    # Schema 迁移：检测旧 schema，备份后升级为新 13 列
+    # Schema 迁移：检测旧 schema，备份后升级为新 14 列
     if signals_csv.exists():
         with open(signals_csv, "r", newline="", encoding="utf-8-sig") as f:
             reader = csv.reader(f)
@@ -359,10 +367,10 @@ def _append_to_csv(records: list[dict], strategy_id: str = "v1_wizard") -> None:
                 header = next(reader)
             except StopIteration:
                 header = []
-        # 旧 schema：不含 "RS评级" 的都是旧版
-        # 新 schema：13 列（含 "RS评级"）
+        # 旧 schema：缺 "Weinstein阶段" 的都是旧版
+        # 新 schema：14 列（含 "Weinstein阶段"）
         needs_migration = (
-            len(header) > 0 and "RS评级" not in header
+            len(header) > 0 and "Weinstein阶段" not in header
         )
         if needs_migration:
             from datetime import datetime as _dt
@@ -371,7 +379,7 @@ def _append_to_csv(records: list[dict], strategy_id: str = "v1_wizard") -> None:
             try:
                 signals_csv.rename(backup_path)
                 print(f"[CSV迁移] 备份旧 schema ({len(header)} 列) → {backup_path}")
-                # 读取旧数据，扩展到 13 列（缺列填 '—'），覆写为新 schema
+                # 读取旧数据，扩展到 14 列（缺列填 '—'），覆写为新 schema
                 with open(backup_path, "r", newline="", encoding="utf-8-sig") as src, \
                      open(signals_csv, "w", newline="", encoding="utf-8-sig") as dst:
                     src_reader = csv.DictReader(src)
@@ -385,10 +393,10 @@ def _append_to_csv(records: list[dict], strategy_id: str = "v1_wizard") -> None:
                         if "RS" in row and "RS (20D)" not in row:
                             row["RS (20D)"] = row.pop("RS")
                         # 缺的新字段填 "—"
-                        for col in ("RS (10D)", "RS (20D)", "RS (10W)", "量比", "RS评级", "RS倍数"):
+                        for col in new_fieldnames:
                             row.setdefault(col, "—")
                         dst_writer.writerow({col: row.get(col, "—") for col in new_fieldnames})
-                print(f"[CSV迁移] 已用新 13 列 schema 覆写 {signals_csv}")
+                print(f"[CSV迁移] 已用新 {len(_CSV_HEADERS)} 列 schema 覆写 {signals_csv}")
             except Exception as e:
                 # 迁移失败，恢复原文件不阻塞写入
                 print(f"[CSV迁移] 备份/迁移失败：{e} — 回退到旧路径")
@@ -438,6 +446,7 @@ def _append_to_csv(records: list[dict], strategy_id: str = "v1_wizard") -> None:
                 "量比": r.get("量比", "—"),
                 "RS评级": r.get("RS评级", "—"),
                 "RS倍数": r.get("RS倍数", "—"),
+                "Weinstein阶段": r.get("Weinstein阶段", "—"),
             })
 
     print(f"[输出] 信号已保存到 {signals_csv}（写入 {len(new_records)} 条新记录，去重 {len(records) - len(new_records)} 条）")

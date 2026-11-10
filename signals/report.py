@@ -135,8 +135,8 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             lines += [
                 "### 买入信号",
                 "",
-                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发摘要 |",
-                "|------|------|------|----------|----------|----------|----------|------|--------|--------|----------|",
+                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | Weinstein阶段 | 触发摘要 |",
+                "|------|------|------|----------|----------|----------|----------|------|--------|--------|--------------|----------|",
             ]
             for r in sorted(buys_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
@@ -146,7 +146,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                     f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
                     f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
                     f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
-                    f"| {_format_rs(r.get('RS倍数'))} | {summary} |"
+                    f"| {_format_rs(r.get('RS倍数'))} | {_format_stage(r.get('Weinstein阶段'))} | {summary} |"
                 )
             lines.append("")
 
@@ -167,8 +167,8 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             lines += [
                 "### 做空信号",
                 "",
-                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发摘要 |",
-                "|------|------|------|----------|----------|----------|----------|------|--------|--------|----------|",
+                "| 日期 | 股票 | 强度 | 参考止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | Weinstein阶段 | 触发摘要 |",
+                "|------|------|------|----------|----------|----------|----------|------|--------|--------|--------------|----------|",
             ]
             for r in sorted(shorts_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
@@ -178,7 +178,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                     f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
                     f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
                     f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
-                    f"| {_format_rs(r.get('RS倍数'))} | {summary} |"
+                    f"| {_format_rs(r.get('RS倍数'))} | {_format_stage(r.get('Weinstein阶段'))} | {summary} |"
                 )
             lines.append("")
 
@@ -186,8 +186,8 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             lines += [
                 "### 🐂 未来潜在买入（底部反弹 / 形态收紧）",
                 "",
-                "| 日期 | 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 参考止损 |",
-                "|------|------|------|------|----------------|----------|----------|----------|----------|------|--------|--------|----------|",
+                "| 日期 | 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | Weinstein阶段 | 参考止损 |",
+                "|------|------|------|------|----------------|----------|----------|----------|----------|------|--------|--------|--------------|----------|",
             ]
             for r in sorted(watches_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
@@ -203,7 +203,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                     f"| {r['日期']} | **{r['股票']}** | {stars} | {stage} | {dist} | {rebound} "
                     f"| {_format_rs(r.get('RS (10D)'))} | {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
                     f"| {_format_vol(r.get('量比'))} | {_format_rating(r.get('RS评级'))} "
-                    f"| {_format_rs(r.get('RS倍数'))} | {r.get('参考止损', '—')} |"
+                    f"| {_format_rs(r.get('RS倍数'))} | {_format_stage(r.get('Weinstein阶段'))} | {r.get('参考止损', '—')} |"
                 )
             lines.append("")
 
@@ -339,6 +339,7 @@ def _format_signal_detail(r: dict, is_today: bool) -> list[str]:
         f"| 量比 | {vol_display} |",
         f"| RS评级 (O'Neil 1-99) | {_format_rating(rating_val)} |",
         f"| RS倍数 (vs SPY 252日) | {_format_rs(mult_val)} |",
+        f"| Weinstein 阶段 | {_format_stage(r.get('Weinstein阶段'))} |",
         f"| 建议操作 | {'明日开盘买入' if is_today else date_str + ' 次日已可执行'} |",
         "",
     ]
@@ -527,6 +528,7 @@ def _format_short_signal(r: dict, is_today: bool) -> list[str]:
         f"| 量比 | {vol_display} |",
         f"| RS评级 (O'Neil 1-99) | {_format_rating(rating_val)} |",
         f"| RS倍数 (vs SPY 252日) | {_format_rs(mult_val)} |",
+        f"| Weinstein 阶段 | {_format_stage(r.get('Weinstein阶段'))} |",
         f"| 建议操作 | {'明日开盘做空' if is_today else date_str + ' 次日已可执行'} |",
         "",
     ]
@@ -656,8 +658,8 @@ def _format_today_buys_table(records: list[dict]) -> list[str]:
     lines = [
         f"## 🟢 今日新增买入信号（{len(records)} 条）",
         "",
-        "| 股票 | 强度 | 止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发条件 |",
-        "|------|------|------|----------|----------|----------|------|--------|--------|----------|",
+        "| 股票 | 强度 | 止损 | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | Weinstein阶段 | 触发条件 |",
+        "|------|------|------|----------|----------|----------|------|--------|--------|--------------|----------|",
     ]
     for r in sorted(records, key=lambda x: (-int(x.get("强度(1-5)", 0)), x.get("RS (10D)", 0))):
         symbol   = r.get("股票", "?")
@@ -670,10 +672,11 @@ def _format_today_buys_table(records: list[dict]) -> list[str]:
         vol      = _format_vol(r.get("量比"))
         rating   = _format_rating(r.get("RS评级"))
         mult     = _format_rs(r.get("RS倍数"))
+        stage    = _format_stage(r.get("Weinstein阶段"))
         trigger  = _extract_trigger_short(r.get("触发原因", ""))
         lines.append(
             f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
-            f"| {rating} | {mult} | {trigger} |"
+            f"| {rating} | {mult} | {stage} | {trigger} |"
         )
     lines.append("")
     lines += [
@@ -691,8 +694,8 @@ def _format_today_watches_table(records: list[dict]) -> list[str]:
         "",
         "> 等待 Wedge Pop 或 Base n' Break 确认后转正为【买入信号】。",
         "",
-        "| 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | 量比 | RS (10D) | RS (20D) | RS (10W) | RS评级 | RS倍数 | 参考止损 |",
-        "|------|------|------|----------------|----------|------|----------|----------|----------|--------|--------|----------|",
+        "| 股票 | 强度 | 类型 | 距EMA20 / 振幅 | 反弹幅度 | 量比 | RS (10D) | RS (20D) | RS (10W) | RS评级 | RS倍数 | Weinstein阶段 | 参考止损 |",
+        "|------|------|------|----------------|----------|------|----------|----------|----------|--------|--------|--------------|----------|",
     ]
     for r in sorted(records, key=lambda x: -int(x.get("强度(1-5)", 0))):
         symbol   = r.get("股票", "?")
@@ -710,7 +713,7 @@ def _format_today_watches_table(records: list[dict]) -> list[str]:
             f"{_format_vol(r.get('量比'))} | {_format_rs(r.get('RS (10D)'))} "
             f"| {_format_rs(r.get('RS (20D)'))} | {_format_rs(r.get('RS (10W)'))} "
             f"| {_format_rating(r.get('RS评级'))} | {_format_rs(r.get('RS倍数'))} "
-            f"| {r.get('参考止损', '—')} |"
+            f"| {_format_stage(r.get('Weinstein阶段'))} | {r.get('参考止损', '—')} |"
         )
     lines.append("")
     lines += [
@@ -725,8 +728,8 @@ def _format_today_shorts_table(records: list[dict]) -> list[str]:
     lines = [
         f"## 🔴 今日做空信号（{len(records)} 条）",
         "",
-        "| 股票 | 强度 | 止损（buy-to-cover） | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | 触发条件 |",
-        "|------|------|---------------------|----------|----------|----------|------|--------|--------|----------|",
+        "| 股票 | 强度 | 止损（buy-to-cover） | RS (10D) | RS (20D) | RS (10W) | 量比 | RS评级 | RS倍数 | Weinstein阶段 | 触发条件 |",
+        "|------|------|---------------------|----------|----------|----------|------|--------|--------|--------------|----------|",
     ]
     for r in sorted(records, key=lambda x: (-int(x.get("强度(1-5)", 0)), x.get("RS (10D)", 1))):
         symbol   = r.get("股票", "?")
@@ -739,10 +742,11 @@ def _format_today_shorts_table(records: list[dict]) -> list[str]:
         vol      = _format_vol(r.get("量比"))
         rating   = _format_rating(r.get("RS评级"))
         mult     = _format_rs(r.get("RS倍数"))
+        stage    = _format_stage(r.get("Weinstein阶段"))
         trigger  = _extract_trigger_short(r.get("触发原因", ""))
         lines.append(
             f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
-            f"| {rating} | {mult} | {trigger} |"
+            f"| {rating} | {mult} | {stage} | {trigger} |"
         )
     lines.append("")
     lines += [
@@ -785,6 +789,13 @@ def _format_vol(val) -> str:
         return f"{float(val):.1f}x"
     except (TypeError, ValueError):
         return str(val)
+
+
+def _format_stage(val) -> str:
+    """格式化 Weinstein 阶段标签：空/破折号→'—'。"""
+    if val is None or val == "" or val == "—":
+        return "—"
+    return str(val)
 
 
 def _extract_trigger_short(reason: str) -> str:
