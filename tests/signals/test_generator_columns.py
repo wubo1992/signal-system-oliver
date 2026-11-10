@@ -24,15 +24,16 @@ from events import EventQueue, EventType
 
 
 def test_csv_headers_include_rs_and_vol_ratio():
-    """_CSV_HEADERS 必须包含 RS (10D/20D/10W)、量比、RS评级、RS倍数 列。"""
+    """_CSV_HEADERS 必须包含 RS (10D/20D/10W)、量比、RS评级、RS倍数、Weinstein阶段 列。"""
     assert "RS (10D)" in _CSV_HEADERS
     assert "RS (20D)" in _CSV_HEADERS
     assert "RS (10W)" in _CSV_HEADERS
     assert "量比" in _CSV_HEADERS
     assert "RS评级" in _CSV_HEADERS
     assert "RS倍数" in _CSV_HEADERS
-    # 总列数 = 13
-    assert len(_CSV_HEADERS) == 13
+    assert "Weinstein阶段" in _CSV_HEADERS
+    # 总列数 = 14
+    assert len(_CSV_HEADERS) == 14
 
 
 def test_event_to_record_includes_rs_volume_ratio():
@@ -99,7 +100,7 @@ def test_event_to_record_handles_missing_rs_vol():
 
 
 def test_append_to_csv_writes_rs_vol_columns(tmp_path, monkeypatch):
-    """_append_to_csv 应该写入 13 列 schema，包括 RS (10D/20D/10W) + 量比 + RS评级 + RS倍数。"""
+    """_append_to_csv 应该写入 14 列 schema，包括 RS (10D/20D/10W) + 量比 + RS评级 + RS倍数 + Weinstein阶段。"""
     # 创建策略目录
     strategy_id = "test_strategy_csv"
     strategy_dir = tmp_path / strategy_id
@@ -147,7 +148,7 @@ def test_append_to_csv_writes_rs_vol_columns(tmp_path, monkeypatch):
 
 
 def test_append_to_csv_migrates_old_schema(tmp_path, monkeypatch):
-    """旧 7 列 CSV 应该自动迁移到 13 列 schema。"""
+    """旧 7 列 CSV 应该自动迁移到 14 列 schema。"""
     strategy_id = "test_strategy_migrate"
     strategy_dir = tmp_path / strategy_id
     strategy_dir.mkdir(parents=True, exist_ok=True)
@@ -185,7 +186,7 @@ def test_append_to_csv_migrates_old_schema(tmp_path, monkeypatch):
     record = _event_to_record(event)
     _append_to_csv([record], strategy_id=strategy_id)
 
-    # 验证 header 是 13 列
+    # 验证 header 是 14 列
     with open(signals_csv, "r", encoding="utf-8-sig") as f:
         reader = csv.DictReader(f)
         rows = list(reader)
@@ -193,13 +194,14 @@ def test_append_to_csv_migrates_old_schema(tmp_path, monkeypatch):
     assert reader.fieldnames == _CSV_HEADERS
     assert len(rows) == 2
 
-    # 旧行迁移后 RS/量比/RS评级/RS倍数 是 '—'
+    # 旧行迁移后 RS/量比/RS评级/RS倍数/Weinstein阶段 是 '—'
     assert rows[0]["RS (10D)"] == "—"
     assert rows[0]["RS (20D)"] == "—"
     assert rows[0]["RS (10W)"] == "—"
     assert rows[0]["量比"] == "—"
     assert rows[0]["RS评级"] == "—"
     assert rows[0]["RS倍数"] == "—"
+    assert rows[0]["Weinstein阶段"] == "—"
     # 新行有真实值
     assert rows[1]["RS (20D)"] == "0.9910"
     assert rows[1]["量比"] == "1.2x"
@@ -211,8 +213,76 @@ def test_append_to_csv_migrates_old_schema(tmp_path, monkeypatch):
     assert len(backups) == 1
 
 
-def test_append_to_csv_migrates_11col_to_13col(tmp_path, monkeypatch):
-    """旧的 11 列 CSV（已有 RS 三列但无 RS评级/RS倍数）应该迁移到 13 列。"""
+def test_append_to_csv_updates_same_day_rows_in_place(tmp_path, monkeypatch):
+    """同一天的同键信号应该原地更新（刷新价格/RS/阶段），且保留用户手填的持仓股数。"""
+    strategy_id = "test_strategy_same_day"
+    strategy_dir = tmp_path / strategy_id
+    strategy_dir.mkdir(parents=True, exist_ok=True)
+    signals_csv = strategy_dir / "signals.csv"
+
+    import signals.generator as gen_mod
+    monkeypatch.setattr(gen_mod, "OUTPUT_DIR", tmp_path)
+
+    today_str = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+    record = {col: "—" for col in _CSV_HEADERS}
+    record.update({
+        "日期": today_str, "股票": "NVDA", "信号": "买入", "强度(1-5)": 5,
+        "触发原因": "old reason", "参考止损": "$100.00", "持仓股数": "300",
+        "RS (20D)": "1.0000", "量比": "1.0x", "Weinstein阶段": "Stage 1 筑底 · 1A 筑底初期",
+    })
+    _append_to_csv([record], strategy_id=strategy_id)
+
+    # 第二次写入：同键但数据刷新了
+    updated_record = dict(record)
+    updated_record["触发原因"] = "new reason"
+    updated_record["参考止损"] = "$120.00"
+    updated_record["RS (20D)"] = "1.2000"
+    updated_record["量比"] = "2.0x"
+    updated_record["Weinstein阶段"] = "Stage 2 上升 · 2A 上升初期"
+    _append_to_csv([updated_record], strategy_id=strategy_id)
+
+    with open(signals_csv, "r", encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f))
+
+    assert len(rows) == 1  # 同日同键不新增行
+    assert rows[0]["触发原因"] == "new reason"
+    assert rows[0]["参考止损"] == "$120.00"
+    assert rows[0]["RS (20D)"] == "1.2000"
+    assert rows[0]["量比"] == "2.0x"
+    assert rows[0]["Weinstein阶段"] == "Stage 2 上升 · 2A 上升初期"
+    assert rows[0]["持仓股数"] == "300"  # 用户手填值保留
+
+
+def test_append_to_csv_keeps_historical_rows_untouched(tmp_path, monkeypatch):
+    """历史日期的同键信号不更新（只跳过），归档数据不被改写。"""
+    strategy_id = "test_strategy_history"
+    strategy_dir = tmp_path / strategy_id
+    strategy_dir.mkdir(parents=True, exist_ok=True)
+    signals_csv = strategy_dir / "signals.csv"
+
+    import signals.generator as gen_mod
+    monkeypatch.setattr(gen_mod, "OUTPUT_DIR", tmp_path)
+
+    record = {col: "—" for col in _CSV_HEADERS}
+    record.update({
+        "日期": "2020-01-02", "股票": "AAPL", "信号": "买入", "强度(1-5)": 4,
+        "触发原因": "old reason", "参考止损": "$100.00",
+    })
+    _append_to_csv([record], strategy_id=strategy_id)
+
+    again = dict(record)
+    again["触发原因"] = "should not be written"
+    _append_to_csv([again], strategy_id=strategy_id)
+
+    with open(signals_csv, "r", encoding="utf-8-sig") as f:
+        rows = list(csv.DictReader(f))
+
+    assert len(rows) == 1
+    assert rows[0]["触发原因"] == "old reason"
+
+
+def test_append_to_csv_migrates_11col_to_14col(tmp_path, monkeypatch):
+    """旧的 11 列 CSV（已有 RS 三列但无 RS评级/RS倍数）应该迁移到 14 列。"""
     strategy_id = "test_strategy_migrate_11"
     strategy_dir = tmp_path / strategy_id
     strategy_dir.mkdir(parents=True, exist_ok=True)
@@ -248,6 +318,7 @@ def test_append_to_csv_migrates_11col_to_13col(tmp_path, monkeypatch):
     assert rows[0]["量比"] == "1.8x"
     assert rows[0]["RS评级"] == "—"
     assert rows[0]["RS倍数"] == "—"
+    assert rows[0]["Weinstein阶段"] == "—"
 
     backups = list(strategy_dir.glob("signals.csv.bak.*"))
     assert len(backups) == 1

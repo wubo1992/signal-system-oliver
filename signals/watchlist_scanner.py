@@ -16,7 +16,7 @@ from typing import Any
 import pandas as pd
 
 from events import SignalEvent
-from strategies.v_oliver_kell.weinstein_stage import compute_weinstein_stage
+from strategies.v_oliver_kell.weinstein_stage import compute_weinstein_detail
 
 
 def scan_watchlist(
@@ -103,7 +103,9 @@ def scan_watchlist(
             rs_value_10d = _compute_rs_value_short(df_to_date, benchmark_df, lookback=10)
             rs_value_10w = _compute_rs_value_long(df_to_date, benchmark_df, lookback=50)
             rs_rating, rs_ratio = oneil_rs_map.get(symbol, (None, None))
-            stage, stage_label = compute_weinstein_stage(df_to_date)
+            stage_detail = compute_weinstein_detail(df_to_date, as_of=date)
+            stage = stage_detail["stage"] if stage_detail else None
+            stage_label = stage_detail["label"] if stage_detail else "—"
 
             sig = SignalEvent.create(
                 symbol=symbol,
@@ -116,7 +118,7 @@ def scan_watchlist(
                        f"Today: +{price_change:.1f}%, vol {vol_ratio:.1f}x avg"
                        f"{_rs_short_token(rs_value_10d)}{_rs_token(rs_value)}{_rs_long_token(rs_value_10w)}"
                        f"{_oneil_rs_token(rs_rating, rs_ratio)}"
-                       f"{_stage_token(stage, stage_label)}",
+                       f"{_stage_token(stage, stage_label, bool(stage_detail and stage_detail.get('is_developing')))}",
                 stop_loss=round(ema20 * 0.95, 2),
                 cycle_stage="reversal_extension",
                 current_price=close,
@@ -129,6 +131,15 @@ def scan_watchlist(
             sig.data["rs_ratio"] = rs_ratio
             sig.data["weinstein_stage"] = stage_label
             sig.data["weinstein_stage_num"] = stage
+            if stage_detail:
+                sig.data["weinstein_substage"] = stage_detail.get("substage")
+                sig.data["weinstein_substage_label"] = stage_detail.get("substage_label")
+                sig.data["weinstein_ma30_slope"] = stage_detail.get("ma30_slope_pct")
+                sig.data["weinstein_price_vs_ma"] = stage_detail.get("price_vs_ma_pct")
+                sig.data["weinstein_weeks_in_stage"] = stage_detail.get("duration_weeks")
+                sig.data["weinstein_developing"] = stage_detail.get("is_developing")
+                sig.data["weinstein_confirmed_label"] = stage_detail.get("confirmed_label")
+                sig.data["weinstein_week_status"] = stage_detail.get("week_status")
             signals.append(sig)
             continue
 
@@ -159,7 +170,9 @@ def scan_watchlist(
                 rs_value_10d = _compute_rs_value_short(df_to_date, benchmark_df, lookback=10)
                 rs_value_10w = _compute_rs_value_long(df_to_date, benchmark_df, lookback=50)
                 rs_rating, rs_ratio = oneil_rs_map.get(symbol, (None, None))
-                stage, stage_label = compute_weinstein_stage(df_to_date)
+                stage_detail = compute_weinstein_detail(df_to_date, as_of=date)
+                stage = stage_detail["stage"] if stage_detail else None
+                stage_label = stage_detail["label"] if stage_detail else "—"
 
                 sig = SignalEvent.create(
                     symbol=symbol,
@@ -171,7 +184,7 @@ def scan_watchlist(
                            f"High 20d: ${high_20:.2f}"
                            f"{_rs_short_token(rs_value_10d)}{_rs_token(rs_value)}{_rs_long_token(rs_value_10w)}{_vol_token(vol_ratio if vol_avg_20 > 0 else None)}"
                            f"{_oneil_rs_token(rs_rating, rs_ratio)}"
-                           f"{_stage_token(stage, stage_label)}",
+                           f"{_stage_token(stage, stage_label, bool(stage_detail and stage_detail.get('is_developing')))}",
                     stop_loss=round(ema20 * 0.98, 2),
                     cycle_stage="base_tightening",
                     current_price=close,
@@ -184,6 +197,15 @@ def scan_watchlist(
                 sig.data["rs_ratio"] = rs_ratio
                 sig.data["weinstein_stage"] = stage_label
                 sig.data["weinstein_stage_num"] = stage
+                if stage_detail:
+                    sig.data["weinstein_substage"] = stage_detail.get("substage")
+                    sig.data["weinstein_substage_label"] = stage_detail.get("substage_label")
+                    sig.data["weinstein_ma30_slope"] = stage_detail.get("ma30_slope_pct")
+                    sig.data["weinstein_price_vs_ma"] = stage_detail.get("price_vs_ma_pct")
+                    sig.data["weinstein_weeks_in_stage"] = stage_detail.get("duration_weeks")
+                    sig.data["weinstein_developing"] = stage_detail.get("is_developing")
+                    sig.data["weinstein_confirmed_label"] = stage_detail.get("confirmed_label")
+                    sig.data["weinstein_week_status"] = stage_detail.get("week_status")
                 signals.append(sig)
 
     return signals
@@ -270,11 +292,12 @@ def _rs_long_token(rs_value: float | None) -> str:
         return ""
 
 
-def _stage_token(stage: int | None, label: str) -> str:
-    """Weinstein 阶段 token（[Stage] Stage 2 上升）。数据不足时返回空串。"""
+def _stage_token(stage: int | None, label: str, developing: bool = False) -> str:
+    """Weinstein 阶段 token（[WStage] Stage 2 上升 · 2A 上升初期）。数据不足时返回空串。"""
     if stage is None:
         return ""
-    return f" | [Stage] {label}"
+    flag = "（发展中）" if developing else ""
+    return f" | [WStage] {label}{flag}"
 
 
 def _oneil_rs_token(rs_rating: int | None, rs_ratio: float | None) -> str:

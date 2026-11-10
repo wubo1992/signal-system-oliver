@@ -35,7 +35,7 @@ from strategies.v_oliver_kell.wedge_finder import WedgeFinder
 from strategies.v_oliver_kell.market_environment import MarketEnvironment, MarketState
 from strategies.v_oliver_kell.scale_in import ScaleInManager, BatchState
 from strategies.v_oliver_kell.exit_manager import ExitManager
-from strategies.v_oliver_kell.weinstein_stage import compute_weinstein_stage
+from strategies.v_oliver_kell.weinstein_stage import compute_weinstein_detail
 
 
 @dataclass
@@ -280,30 +280,41 @@ class OliverKellStrategy(StrategyBase):
         """取 O'Neil RS 评级（1-99 百分位）与 RS 倍数（财富指数之比 vs SPY）。"""
         return self._oneil_rs_map.get(symbol, (None, None))
 
-    def _get_weinstein_stage(self, symbol: str, date: datetime) -> tuple[int | None, str]:
-        """取 Weinstein 四阶段判断（截至 date），返回 (阶段编号, 展示标签)。
+    def _get_weinstein_stage(self, symbol: str, date: datetime) -> dict | None:
+        """取 Weinstein 四阶段判断（截至 date），返回阶段详情 dict。
 
-        数据不足（K 线 < 200 根）时返回 (None, "—")。
+        口径：周线 + 30 周均线的经典结构引擎（WEINSTEIN-STRUCTURE-1.3）。
+        数据不足（周线 < 60 根）时返回 None。
         """
         df = self.market_data.get(symbol)
         if df is None or df.empty:
-            return None, "—"
-        return compute_weinstein_stage(self._slice_to_date(df, date))
+            return None
+        return compute_weinstein_detail(self._slice_to_date(df, date), as_of=date)
 
     def _attach_weinstein_stage(self, sig: SignalEvent, date: datetime) -> None:
-        """给信号挂上 Weinstein 阶段（event.data + reason 里的 [Stage] token）。
+        """给信号挂上 Weinstein 阶段（event.data + reason 里的 [WStage] token）。
 
         阶段是「这只票现在处于中长期趋势的哪一段」的背景信息，
         与 Kell 六阶段的短期形态判断互补：Stage 2 里的 Wedge Pop 才是最强买点。
         """
-        stage, label = self._get_weinstein_stage(sig.symbol, date)
-        if stage is None:
+        detail = self._get_weinstein_stage(sig.symbol, date)
+        if not detail:
             return
+        label = detail["label"]
         sig.data["weinstein_stage"] = label
-        sig.data["weinstein_stage_num"] = stage
+        sig.data["weinstein_stage_num"] = detail["stage"]
+        sig.data["weinstein_substage"] = detail.get("substage")
+        sig.data["weinstein_substage_label"] = detail.get("substage_label")
+        sig.data["weinstein_ma30_slope"] = detail.get("ma30_slope_pct")
+        sig.data["weinstein_price_vs_ma"] = detail.get("price_vs_ma_pct")
+        sig.data["weinstein_weeks_in_stage"] = detail.get("duration_weeks")
+        sig.data["weinstein_developing"] = detail.get("is_developing")
+        sig.data["weinstein_confirmed_label"] = detail.get("confirmed_label")
+        sig.data["weinstein_week_status"] = detail.get("week_status")
         reason = sig.data.get("reason")
-        if reason and "[Stage]" not in reason:
-            sig.data["reason"] = f"{reason} | [Stage] {label}"
+        if reason and "[WStage]" not in reason:
+            developing = "（发展中）" if detail.get("is_developing") else ""
+            sig.data["reason"] = f"{reason} | [WStage] {label}{developing}"
 
     @staticmethod
     def _format_oneil_rs_note(rs_rating: int | None, rs_ratio: float | None) -> str:

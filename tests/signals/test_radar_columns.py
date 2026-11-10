@@ -131,11 +131,11 @@ def test_build_radar_report_includes_rs_and_volume_columns():
     assert "RS 10W" in md
     assert "Vol Ratio" in md
     # 长信号区
-    assert "| Ticker | Strength | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Action | Stop Loss | Context |" in md
+    assert "| Ticker | Strength | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Weinstein | Vol Ratio | Action | Stop Loss | Context |" in md
     # 短信号区
-    assert "| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Signal | Action | Stop Loss | Context |" in md
+    assert "| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Weinstein | Vol Ratio | Signal | Action | Stop Loss | Context |" in md
     # Watchlist
-    assert "| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Vol Ratio | Stage | Context |" in md
+    assert "| Ticker | RS 10D | RS 20D | RS 10W | O'Neil RS | RS Mult | Weinstein | Vol Ratio | Stage | Context |" in md
 
 
 def test_build_radar_report_handles_missing_rs_volume():

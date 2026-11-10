@@ -564,7 +564,7 @@ def _parse_reason(reason: str) -> dict:
     parts = reason.split(" | ")
     for part in parts:
         part = part.strip()
-        for key in ["[趋势]", "[RS-10D]", "[RS-10W]", "[RS]", "[VCP]", "[突破]", "[量能]", "[Vol]", "[Stage]"]:
+        for key in ["[趋势]", "[RS-10D]", "[RS-10W]", "[RS]", "[VCP]", "[突破]", "[量能]", "[Vol]", "[Stage]", "[WStage]"]:
             if part.startswith(key):
                 sections[key] = part[len(key):].strip()
                 break
