@@ -1,215 +1,211 @@
 """
-signals/log_generator.py — v_eps_v2 信号日志生成器
+signals/log_generator.py — v_oliver_kell 信号日志生成器
 
 每次 live test 后自动生成/更新 SIGNALS_LOG.md，
-按日期记录 v_eps_v2 的买入和卖出信号，方便复盘和业绩复核。
+按日期记录多头和空头信号，方便复盘和业绩复核。
+
+CSV 表头是中文（且带 BOM），读取时统一归一化成内部英文 key，
+下游不再到处改列名。
 """
 
 from datetime import datetime
 from pathlib import Path
+import csv
 import re
 
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 SIGNALS_LOG_FILE = OUTPUT_DIR / "SIGNALS_LOG.md"
 
 # 策略 ID
-ALL_STRATEGIES = ["v_eps_v2"]
+ALL_STRATEGIES = ["v_oliver_kell"]
 
 # 策略显示名称
 STRATEGY_NAMES = {
-    "v_eps_v2": "v_eps_v2",
+    "v_oliver_kell": "v_oliver_kell",
 }
+
+# signals.csv 的中文表头 → 本模块内部统一使用的英文 key。
+_CSV_COLUMNS = {
+    "日期": "date",
+    "股票": "symbol",
+    "信号": "signal",
+    "触发原因": "reason",
+    "强度(1-5)": "strength",
+    "参考止损": "stop_loss",
+    "RS (10D)": "rs_10d",
+    "RS (20D)": "rs_20d",
+    "RS (10W)": "rs_10w",
+    "量比": "volume_ratio",
+    "RS评级": "rs_rating",
+    "RS倍数": "rs_ratio",
+    "Weinstein阶段": "weinstein_stage",
+}
+
+# 信号值 → 多 / 空。
+# 观望归入多头：形态成立即候选，只是还没到确认开仓那一步。
+_SIGNAL_TO_SIDE = {
+    "买入": "long",
+    "观望": "long",
+    "卖出": "short",
+    "做空": "short",
+}
+
+
+def _cell(text) -> str:
+    """Markdown 表格单元格转义：裸竖线会把一行冲出表格。"""
+    if text is None or text == "":
+        return "—"
+    return str(text).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+
+
+def _pattern(reason: str) -> str:
+    """取触发原因里的第一个策略标签（如 'EMA Crossback' / 'Wedge Drop'）。"""
+    if not reason:
+        return "—"
+    m = re.match(r"\s*\[([^\]]+)\]", reason)
+    return m.group(1) if m else "—"
+
+
+def _summary(reason: str, limit: int = 140) -> str:
+    """触发原因摘要：分段用 ' / ' 连接，截断到 limit 字符。"""
+    if not reason:
+        return "—"
+    parts = []
+    for segment in reason.split("|"):
+        segment = segment.strip()
+        if segment:
+            parts.append(segment)
+    text = " / ".join(parts)
+    if len(text) > limit:
+        text = text[:limit - 1] + "…"
+    return text
+
+
+def _read_rows(strategy_id: str) -> list[dict]:
+    """读取策略 signals.csv 的全部行，归一化成内部英文 key。"""
+    csv_path = OUTPUT_DIR / strategy_id / "signals.csv"
+    if not csv_path.exists():
+        return []
+
+    rows: list[dict] = []
+    # utf-8-sig：signals.csv 的表头第一个字段带 BOM，用 utf-8 读会变成
+    # '﻿日期'，列名对不上。
+    with open(csv_path, "r", encoding="utf-8-sig", newline="") as f:
+        for raw in csv.DictReader(f):
+            row = {_CSV_COLUMNS.get(k, k): v for k, v in raw.items() if k is not None}
+            row["date"] = (row.get("date") or "")[:10]
+            if row["date"]:
+                rows.append(row)
+    return rows
 
 
 def load_signals_from_csv(strategy_id: str, date_str: str) -> tuple[list[dict], list[dict]]:
     """
-    从策略的 signals.csv 加载指定日期的买入和卖出信号。
+    从策略的 signals.csv 加载指定日期的多头和空头信号。
 
-    返回: (buy_signals, sell_signals)
+    返回: (long_signals, short_signals)
     """
-    csv_path = OUTPUT_DIR / strategy_id / "signals.csv"
-    if not csv_path.exists():
-        return [], []
+    long_signals: list[dict] = []
+    short_signals: list[dict] = []
 
-    buy_signals = []
-    sell_signals = []
+    for row in _read_rows(strategy_id):
+        if row["date"] != date_str:
+            continue
+        side = _SIGNAL_TO_SIDE.get((row.get("signal") or "").strip())
+        if side == "long":
+            long_signals.append(row)
+        elif side == "short":
+            short_signals.append(row)
 
-    try:
-        import csv
-        with open(csv_path, "r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                date = row.get("date", "")[:10]
-                if date != date_str:
-                    continue
-                direction = row.get("direction", "").strip()
-                if direction == "buy":
-                    buy_signals.append(row)
-                elif direction in ("sell", "sell_partial"):
-                    sell_signals.append(row)
-    except Exception:
-        pass
-
-    return buy_signals, sell_signals
+    return long_signals, short_signals
 
 
-def extract_breakout_info(reason: str) -> tuple[str, str]:
-    """从 reason 字符串中提取突破幅度和放量倍数"""
-    breakout_pct = "-"
-    volume_ratio = "-"
+def _summary_table(rows: list[dict], side_label: str) -> list[str]:
+    """多头 / 空头共用的汇总表。"""
+    lines = [
+        f"### {side_label}信号汇总",
+        "",
+        "| 股票 | 信号 | 强度 | 形态 | Weinstein | RS 10D | RS 20D | RS 10W | 量比 | 参考止损 |",
+        "|------|------|------|------|------------|--------|--------|--------|------|----------|",
+    ]
+    for r in sorted(rows, key=lambda x: (-int(x.get("strength") or 0), x.get("symbol", ""))):
+        lines.append(
+            f"| **{r.get('symbol', '')}** | {r.get('signal', '—')} | {r.get('strength', '—')} "
+            f"| {_cell(_pattern(r.get('reason', '')))} "
+            f"| {_cell(r.get('weinstein_stage') or '—')} "
+            f"| {r.get('rs_10d') or '—'} | {r.get('rs_20d') or '—'} | {r.get('rs_10w') or '—'} "
+            f"| {r.get('volume_ratio') or '—'} | {r.get('stop_loss') or '—'} |"
+        )
+    lines.append("")
+    return lines
 
-    if "突破" in reason or "涨幅" in reason:
-        m = re.search(r"([+\-]?\d+\.?\d*)%", reason)
-        if m:
-            breakout_pct = m.group(1) + "%"
 
-    if "倍" in reason or "x" in reason.lower():
-        m = re.search(r"(\d+\.?\d*)\s*[倍xX]", reason)
-        if m:
-            volume_ratio = m.group(1) + "x"
-
-    return breakout_pct, volume_ratio
+def _detail_table(rows: list[dict]) -> list[str]:
+    """触发原因详情（每只股票一段）。"""
+    lines = ["### 信号详情", ""]
+    for r in sorted(rows, key=lambda x: (-int(x.get("strength") or 0), x.get("symbol", ""))):
+        lines += [
+            f"#### {r.get('symbol', '')} — {r.get('signal', '')}",
+            "",
+            f"- 形态：{_pattern(r.get('reason', ''))}",
+            f"- 强度：{r.get('strength', '—')}/5",
+            f"- 参考止损：{r.get('stop_loss') or '—'}",
+            f"- 触发摘要：{_summary(r.get('reason', ''))}",
+            "",
+        ]
+    return lines
 
 
 def generate_daily_section(
     date_str: str,
-    all_buy_signals: dict[str, list],
-    all_sell_signals: dict[str, list],
+    long_signals: list[dict],
+    short_signals: list[dict],
 ) -> str:
     """生成某一天的信号汇总部分"""
 
-    lines = []
-    lines.append(f"## {date_str}")
-    lines.append("")
+    lines = [f"## {date_str}", ""]
 
-    # 收集所有买入信号的股票
-    buy_symbols = set()
-    for signals in all_buy_signals.values():
-        for sig in signals:
-            buy_symbols.add(sig["symbol"])
+    if long_signals:
+        lines += _summary_table(long_signals, "多头")
+        lines += _detail_table(long_signals)
+    if short_signals:
+        lines += _summary_table(short_signals, "空头")
+        lines += _detail_table(short_signals)
 
-    # 收集所有卖出信号的股票
-    sell_symbols = set()
-    for signals in all_sell_signals.values():
-        for sig in signals:
-            sell_symbols.add(sig["symbol"])
-
-    # ========== 买入信号汇总表 ==========
-    if buy_symbols:
-        lines.append("### 买入信号汇总")
-        lines.append("")
-        header = "| 股票 | " + " | ".join([STRATEGY_NAMES[s] for s in ALL_STRATEGIES]) + " | 综合评分 |"
-        lines.append(header)
-        separator = "|------|" + "|".join(["----"] * len(ALL_STRATEGIES)) + "|----|"
-        lines.append(separator)
-
-        for symbol in sorted(buy_symbols):
-            row = f"| **{symbol}** |"
-            count = 0
-            for strategy in ALL_STRATEGIES:
-                signals = all_buy_signals.get(strategy, [])
-                matched = [s for s in signals if s["symbol"] == symbol]
-                if matched:
-                    stars = matched[0]["strength"]
-                    row += f" {stars} |"
-                    count += 1
-                else:
-                    row += " - |"
-            row += f" {count}策略 |"
-            lines.append(row)
-
-        lines.append("")
-
-    # ========== 买入信号详情 ==========
-    if buy_symbols:
-        lines.append("### 买入信号详情")
-        lines.append("")
-
-        for symbol in sorted(buy_symbols):
-            strategies_with_signal = []
-            for strategy in ALL_STRATEGIES:
-                signals = all_buy_signals.get(strategy, [])
-                matched = [s for s in signals if s["symbol"] == symbol]
-                if matched:
-                    sig = matched[0]
-                    breakout, vol = extract_breakout_info(sig["reason"])
-                    strategies_with_signal.append({
-                        "strategy": strategy,
-                        "strength": sig["strength"],
-                        "breakout": breakout,
-                        "volume": vol,
-                        "stop_loss": sig["stop_loss"],
-                    })
-
-            if strategies_with_signal:
-                lines.append(f"#### {symbol}")
-                lines.append("")
-                lines.append("| 策略 | 强度 | 突破幅度 | 放量倍数 | 参考止损 |")
-                lines.append("|------|------|---------|---------|---------|")
-                for s in strategies_with_signal:
-                    lines.append(f"| {STRATEGY_NAMES[s['strategy']]} | {s['strength']} | {s['breakout']} | {s['volume']} | ${s['stop_loss']} |")
-                lines.append("")
-
-    # ========== 卖出信号汇总表 ==========
-    if sell_symbols:
-        lines.append("### 卖出信号汇总")
-        lines.append("")
-
-        header = "| 股票 | " + " | ".join([STRATEGY_NAMES[s] for s in ALL_STRATEGIES]) + " | 原因 |"
-        lines.append(header)
-        separator = "|------|" + "|".join(["----"] * len(ALL_STRATEGIES)) + "|----|"
-        lines.append(separator)
-
-        for symbol in sorted(sell_symbols):
-            row = f"| **{symbol}** |"
-            reasons = []
-            for strategy in ALL_STRATEGIES:
-                signals = all_sell_signals.get(strategy, [])
-                matched = [s for s in signals if s["symbol"] == symbol]
-                if matched:
-                    row += " 卖 |"
-                    if matched[0]["reason"] not in reasons:
-                        reasons.append(matched[0]["reason"])
-                else:
-                    row += " - |"
-            reason_short = reasons[0] if reasons else ""
-            if "止损" in reason_short and "跌幅" in reason_short:
-                m = re.search(r"跌幅([-\d.]+%)", reason_short)
-                if m:
-                    reason_short = f"止损({m.group(1)})"
-                else:
-                    reason_short = "止损"
-            elif "追踪止盈" in reason_short:
-                reason_short = "追踪止盈"
-            elif "时间止损" in reason_short:
-                reason_short = "时间止损"
-            row += f" {reason_short} |"
-            lines.append(row)
-
-        lines.append("")
-
-    # ========== 卖出信号详情 ==========
-    if sell_symbols:
-        lines.append("### 卖出信号详情")
-        lines.append("")
-        lines.append("| 股票 | 策略 | 出场原因 | 入场价 | 当前价 |")
-        lines.append("|------|------|---------|-------|-------|")
-
-        for symbol in sorted(sell_symbols):
-            for strategy in ALL_STRATEGIES:
-                signals = all_sell_signals.get(strategy, [])
-                matched = [s for s in signals if s["symbol"] == symbol]
-                if matched:
-                    sig = matched[0]
-                    reason = sig["reason"][:50] + "..." if len(sig["reason"]) > 50 else sig["reason"]
-                    lines.append(f"| {symbol} | {STRATEGY_NAMES[strategy]} | {reason} | - | - |")
-
-        lines.append("")
+    if not long_signals and not short_signals:
+        lines += ["（当日无信号）", ""]
 
     lines.append("---")
     lines.append("")
 
     return "\n".join(lines)
+
+
+def _header() -> str:
+    """日志文件头部。"""
+    return f"""# 信号汇总日志（v_oliver_kell）
+
+> 自动生成，每次 live test 后更新
+> 用于复盘和业绩复核
+> 最后更新：{datetime.now().strftime("%Y-%m-%d %H:%M")}
+
+---
+
+"""
+
+
+def _strip_old_header(content: str) -> str:
+    """
+    剥掉旧头部。
+
+    按「行首一级标题」匹配，不写死标题文本——历史文件的头是
+    「# 全策略信号汇总日志」，写死判断就剥不掉，新旧两个头会叠在一起。
+    """
+    if content.startswith("# "):
+        match = re.search(r"^---\n+", content, re.MULTILINE)
+        if match:
+            return content[match.end():]
+    return content
 
 
 def update_signals_log(date_str: str | None = None) -> None:
@@ -223,23 +219,24 @@ def update_signals_log(date_str: str | None = None) -> None:
         date_str = datetime.now().strftime("%Y-%m-%d")
 
     # 加载所有策略的信号
-    all_buy_signals: dict[str, list] = {}
-    all_sell_signals: dict[str, list] = {}
+    all_long: dict[str, list] = {}
+    all_short: dict[str, list] = {}
 
     for strategy in ALL_STRATEGIES:
-        buy, sell = load_signals_from_csv(strategy, date_str)
-        if buy:
-            all_buy_signals[strategy] = buy
-        if sell:
-            all_sell_signals[strategy] = sell
+        longs, shorts = load_signals_from_csv(strategy, date_str)
+        if longs:
+            all_long[strategy] = longs
+        if shorts:
+            all_short[strategy] = shorts
 
     # 如果没有任何信号，跳过
-    if not all_buy_signals and not all_sell_signals:
+    if not all_long and not all_short:
         print(f"[信号日志] {date_str} 无信号，跳过更新")
         return
 
-    # 生成新的一天部分
-    new_section = generate_daily_section(date_str, all_buy_signals, all_sell_signals)
+    long_rows = [s for sigs in all_long.values() for s in sigs]
+    short_rows = [s for sigs in all_short.values() for s in sigs]
+    new_section = generate_daily_section(date_str, long_rows, short_rows)
 
     # 读取现有文件
     if SIGNALS_LOG_FILE.exists():
@@ -265,27 +262,44 @@ def update_signals_log(date_str: str | None = None) -> None:
             existing_content = existing_content.rstrip() + "\n\n" + new_section
         print(f"[信号日志] 添加 {date_str} 的信号记录")
 
-    # 更新文件头部的生成时间
-    header = f"""# 信号汇总日志（v_eps_v2）
-
-> 自动生成，每次 live test 后更新
-> 用于复盘和业绩复核
-> 最后更新：{datetime.now().strftime("%Y-%m-%d %H:%M")}
-
----
-
-"""
-    # 移除旧头部
-    if existing_content.startswith("# 信号汇总日志"):
-        match = re.search(r"^---\n+", existing_content, re.MULTILINE)
-        if match:
-            existing_content = existing_content[match.end():]
+    existing_content = _strip_old_header(existing_content)
 
     # 写入文件
     with open(SIGNALS_LOG_FILE, "w", encoding="utf-8") as f:
-        f.write(header + existing_content)
+        f.write(_header() + existing_content)
 
     print(f"[信号日志] 已保存到 {SIGNALS_LOG_FILE}")
+
+
+def rebuild_signals_log() -> int:
+    """
+    从 signals.csv 全量重建 SIGNALS_LOG.md。
+
+    日期倒序（新的在顶部）。逐日调用 update_signals_log 也能得到同样结果，
+    但那样要把 CSV 重读几百遍 —— 重建时一次读完，按日期分组。
+
+    返回重建出的日期数。
+    """
+    by_date: dict[str, tuple[list[dict], list[dict]]] = {}
+    for row in _read_rows(ALL_STRATEGIES[0]):
+        side = _SIGNAL_TO_SIDE.get((row.get("signal") or "").strip())
+        longs, shorts = by_date.setdefault(row["date"], ([], []))
+        if side == "long":
+            longs.append(row)
+        elif side == "short":
+            shorts.append(row)
+
+    # 升序生成，倒序拼接 → 最终是倒序（最新在顶部）
+    sections = [
+        generate_daily_section(date_str, by_date[date_str][0], by_date[date_str][1])
+        for date_str in sorted(by_date)
+    ]
+
+    with open(SIGNALS_LOG_FILE, "w", encoding="utf-8") as f:
+        f.write(_header() + "\n".join(reversed(sections)))
+
+    print(f"[信号日志] 已重建 {len(sections)} 个日期 → {SIGNALS_LOG_FILE}")
+    return len(sections)
 
 
 if __name__ == "__main__":

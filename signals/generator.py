@@ -201,7 +201,13 @@ def _print_table(records: list[dict], watchlist_records: list[dict] | None = Non
                     "股票": getattr(r, "symbol", ""),
                     "触发原因": r.data.get("reason", ""),
                     "强度(1-5)": r.data.get("strength", 0),
-                    "参考止损": r.data.get("stop_loss", "—"),
+                    # watchlist 的 stop_loss 是裸 float，跟买入/做空行的 "$xx.xx"
+                    # 统一成货币字符串（CSV 里本来就是这个格式）
+                    "参考止损": (
+                        f"${r.data['stop_loss']:.2f}"
+                        if isinstance(r.data.get("stop_loss"), (int, float))
+                        else r.data.get("stop_loss", "—")
+                    ),
                     "日期": r.timestamp.strftime("%Y-%m-%d") if hasattr(r, "timestamp") else "",
                     "RS (10D)": f"{float(rs_value_10d):.4f}" if isinstance(rs_value_10d, (int, float)) else "—",
                     "RS (20D)": f"{float(rs_value):.4f}" if isinstance(rs_value, (int, float)) else "—",

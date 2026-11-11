@@ -140,7 +140,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             ]
             for r in sorted(buys_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
-                summary = _short_summary(r.get("触发原因", ""))
+                summary = _md_cell(_short_summary(r.get("触发原因", "")))
                 lines.append(
                     f"| {r['日期']} | **{r['股票']}** | {stars} "
                     f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
@@ -158,7 +158,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
                 "|------|------|----------|----------|",
             ]
             for r in sorted(sells_7d, key=lambda x: x.get("日期", ""), reverse=True):
-                reason_short = r.get("触发原因", "")[:45]
+                reason_short = _md_cell(r.get("触发原因", "")[:45])
                 shares = r.get("持仓股数", "—")
                 lines.append(f"| {r['日期']} | **{r['股票']}** | {shares:>8} | {reason_short} |")
             lines.append("")
@@ -172,7 +172,7 @@ def _build_report(today_str: str, today_records: list[dict], history: list[dict]
             ]
             for r in sorted(shorts_7d, key=lambda x: x.get("日期", ""), reverse=True):
                 stars = "★" * int(r.get("强度(1-5)", 0))
-                summary = _short_summary(r.get("触发原因", ""))
+                summary = _md_cell(_short_summary(r.get("触发原因", "")))
                 lines.append(
                     f"| {r['日期']} | **{r['股票']}** | {stars} "
                     f"| {r.get('参考止损', '—')} | {_format_rs(r.get('RS (10D)'))} "
@@ -558,6 +558,18 @@ def _format_short_signal(r: dict, is_today: bool) -> list[str]:
 # 触发原因解析器
 # ══════════════════════════════════════════════════════════
 
+def _md_cell(text) -> str:
+    """
+    把文本变成可以安全放进 Markdown 表格单元格的字符串。
+
+    Kell 的触发原因用 " | " 分段（"[EMA Crossback] Entry | [RS] 1.0676 | ..."），
+    裸竖线会被 Markdown 当成列分隔符，一行就会冲破表格 —— 必须转义。
+    """
+    if text is None:
+        return "—"
+    return str(text).replace("|", "\\|").replace("\n", " ").replace("\r", " ")
+
+
 def _parse_reason(reason: str) -> dict:
     """把 '[趋势] ... | [RS] ... | [VCP] ...' 拆分成字典。"""
     sections = {}
@@ -673,7 +685,7 @@ def _format_today_buys_table(records: list[dict]) -> list[str]:
         rating   = _format_rating(r.get("RS评级"))
         mult     = _format_rs(r.get("RS倍数"))
         stage    = _format_stage(r.get("Weinstein阶段"))
-        trigger  = _extract_trigger_short(r.get("触发原因", ""))
+        trigger  = _md_cell(_extract_trigger_short(r.get("触发原因", "")))
         lines.append(
             f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
             f"| {rating} | {mult} | {stage} | {trigger} |"
@@ -743,7 +755,7 @@ def _format_today_shorts_table(records: list[dict]) -> list[str]:
         rating   = _format_rating(r.get("RS评级"))
         mult     = _format_rs(r.get("RS倍数"))
         stage    = _format_stage(r.get("Weinstein阶段"))
-        trigger  = _extract_trigger_short(r.get("触发原因", ""))
+        trigger  = _md_cell(_extract_trigger_short(r.get("触发原因", "")))
         lines.append(
             f"| **{symbol}** | {stars} | {stop} | {rs_10d} | {rs_20d} | {rs_10w} | {vol} "
             f"| {rating} | {mult} | {stage} | {trigger} |"
@@ -877,7 +889,9 @@ def _short_summary(reason: str) -> str:
         mult_match = re.search(r"([\d.]+)倍", vol)
         if mult_match:
             parts.append(f"量{mult_match.group(1)}x")
-    return " | ".join(parts) if parts else reason[:40]
+    # 兜底用策略标签（无竖线），不要用原始 reason —— 原始 reason 里的
+    # " | " 会把表格冲出列。
+    return " / ".join(parts) if parts else _extract_trigger_short(reason)
 
 
 def _days_ago(n: int) -> str:

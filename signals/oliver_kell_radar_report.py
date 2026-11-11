@@ -792,26 +792,33 @@ def _build_radar_report(
 # ══════════════════════════════════════════════════════════
 
 def _short_context(reason: str) -> str:
-    """从 reason 中提取简短上下文。"""
+    """
+    从 reason 中提取简短上下文。
+
+    reason 用 " | " 分段（"[EMA Crossback] Entry | [RS-10D] 1.0676 | ..."），
+    裸竖线会被 Markdown 当成列分隔符，把这一行冲出表格 —— 所以这里把分段
+    拼成 " / "，并保证返回值里不含竖线。
+    """
     if not reason:
         return ""
 
-    # 移除方括号标签
-    reason = re.sub(r'\[[^\]]+\]\s*', '', reason)
-
-    # 提取关键数值
-    ema_match = re.search(r'EMA.*?([\d.]+)', reason)
-    price_match = re.search(r'\$?([\d.]+)', reason)
-
     parts = []
-    if ema_match:
-        parts.append(f"EMA: {ema_match.group(0)}")
-    if price_match:
-        parts.append(f"${price_match.group(1)}")
+    for segment in reason.split("|"):
+        segment = segment.strip()
+        if not segment:
+            continue
+        # "[RS-10D] 1.0676" → "RS-10D 1.0676"
+        segment = re.sub(r"^\[([^\]]+)\]\s*", r"\1 ", segment)
+        parts.append(segment)
 
-    # 移除冗余部分
-    reason = reason.strip()
-    if len(reason) > 50:
-        reason = reason[:50] + "..."
+    # 按段落截断，不要在数字中间砍断
+    out: list[str] = []
+    total = 0
+    for part in parts:
+        if total and total + len(part) + 3 > 70:
+            out.append("…")
+            break
+        out.append(part)
+        total += len(part) + 3
 
-    return reason if not parts else f"{reason} ({', '.join(parts)})"
+    return " / ".join(out).replace("|", "\\|")
