@@ -9,7 +9,7 @@
 
 ---
 
-## 当前手动池总数：302 只（美股302）
+## 当前手动池总数：324 只（美股324）
 
 ---
 
@@ -320,6 +320,28 @@
 | CIFR | Cipher Mining | Oliver Kell 池 |
 | WYFI | WiSA Technologies | Oliver Kell 池 |
 | HUT | Hut 8 Mining | Oliver Kell 池 |
+| RXRX | Recursion Pharmaceuticals | Oliver Kell 池 |
+| SDGR | Schrodinger | Oliver Kell 池 |
+| GENB | Generate Biomedicines | Oliver Kell 池 |
+| ABCL | AbCellera Biologics | Oliver Kell 池 |
+| ABSI | Absci | Oliver Kell 池 |
+| IAM | Iambic Therapeutics | Oliver Kell 池 |
+| BIOA | BioAge Labs | Oliver Kell 池 |
+| LTRN | Lantern Pharma | Oliver Kell 池 |
+| EVAX | Evaxion | Oliver Kell 池 |
+| IBIO | iBio | Oliver Kell 池 |
+| EIKN | Eikon Therapeutics | Oliver Kell 池 |
+| GLUE | Monte Rosa Therapeutics | Oliver Kell 池 |
+| NMRA | Neumora Therapeutics | Oliver Kell 池 |
+| TEM | Tempus AI | Oliver Kell 池 |
+| AGPU | Axe Compute | Oliver Kell 池 |
+| BFRG | Bullfrog AI Holdings | Oliver Kell 池 |
+| AMGN | Amgen | Oliver Kell 池 |
+| AZN | AstraZeneca | Oliver Kell 池 |
+| MRK | Merck | Oliver Kell 池 |
+| NVS | Novartis | Oliver Kell 池 |
+| SNY | Sanofi | Oliver Kell 池 |
+| TAK | Takeda | Oliver Kell 池 |
 
 ---
 
